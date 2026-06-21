@@ -1,0 +1,30 @@
+<Project>
+
+  <!-- ===================================================================== -->
+  <!-- Game library resolution.                                              -->
+  <!--                                                                       -->
+  <!-- GameLibsFolder must point at the install's                           -->
+  <!--   OxygenNotIncluded_Data/Managed                                      -->
+  <!-- folder so the build can resolve Assembly-CSharp.dll, UnityEngine.*,   -->
+  <!-- 0Harmony.dll, etc.                                                    -->
+  <!--                                                                       -->
+  <!-- Resolution order:                                                     -->
+  <!--   1. A machine-specific Directory.Build.props.user (git-ignored).     -->
+  <!--      Copy Directory.Build.props.default to that name and edit it.     -->
+  <!--   2. The default Steam install path below.                            -->
+  <!-- Do NOT commit machine-specific paths.                                 -->
+  <!-- ===================================================================== -->
+
+  <PropertyGroup>
+    <GameDir Condition="'$(GameDir)' == ''">C:\Program Files (x86)\Steam\steamapps\common\OxygenNotIncluded</GameDir>
+    <GameLibsFolder Condition="'$(GameLibsFolder)' == ''">$(GameDir)\OxygenNotIncluded_Data\Managed</GameLibsFolder>
+
+    <!-- Klei Dev mods folder: mods placed here are not auto-disabled on crash. -->
+    <ModDeployFolder Condition="'$(ModDeployFolder)' == ''">$(USERPROFILE)\Documents\Klei\OxygenNotIncluded\mods\Dev\NextStepGuide</ModDeployFolder>
+  </PropertyGroup>
+
+  <!-- Per-machine override (git-ignored). Wins over the defaults above. -->
+  <Import Project="$(MSBuildThisFileDirectory)Directory.Build.props.user"
+          Condition="Exists('$(MSBuildThisFileDirectory)Directory.Build.props.user')" />
+
+</Project>

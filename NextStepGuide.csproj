@@ -1,0 +1,146 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- ONI's Unity 6 / U59 update moved the game's scripting runtime to .NET
+         Framework 4.8 (PLib 4.24 ships net48/netstandard2.1 only). Verified
+         against the install on 2026-06-21. -->
+    <TargetFramework>net48</TargetFramework>
+    <AssemblyName>NextStepGuide</AssemblyName>
+    <RootNamespace>NextStepGuide</RootNamespace>
+    <LangVersion>9.0</LangVersion>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Deterministic>true</Deterministic>
+
+    <!-- This csproj sits at the repo root, so the default recursive *.cs glob
+         would also sweep in the test project's generated obj/ files (CS0579
+         duplicate-attribute errors). Compile only our own source instead. -->
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <Configuration Condition="'$(Configuration)' == ''">Release</Configuration>
+
+    <!-- Single self-contained DLL: keep the TFM out of the output path and
+         don't drag transitive deps to output (we ILRepack what we need). -->
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
+    <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
+    <AssemblyVersion>0.1.0.0</AssemblyVersion>
+    <FileVersion>0.1.0.0</FileVersion>
+
+    <!-- Package deps (PLib, YamlDotNet) must land in bin/ so ILRepack can merge
+         them; the ILRepack target then deletes the standalone copies. Game and
+         Unity references are Private=false, so they never copy regardless. -->
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+  </PropertyGroup>
+
+  <!-- =====================================================================
+       Build-time only: net471 reference assemblies (no admin targeting-pack
+       install needed) so 'dotnet build' can compile net471 headless.
+       ===================================================================== -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies.net48" Version="1.0.3">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <!-- =====================================================================
+       Merged-in dependency (ILRepack folds this into NextStepGuide.dll).
+       NOTE: YamlDotNet is NOT referenced here — the game already bundles it
+       inside Assembly-CSharp-firstpass, so we compile/run against that copy.
+       Pulling the NuGet package in too causes type-collision errors (CS0433).
+       ===================================================================== -->
+  <ItemGroup>
+    <PackageReference Include="PLib" Version="4.24.0" />
+  </ItemGroup>
+
+  <!-- ILRepack MSBuild task (build-time tooling only). -->
+  <ItemGroup>
+    <PackageReference Include="ILRepack.Lib.MSBuild.Task" Version="2.0.45" PrivateAssets="all" />
+  </ItemGroup>
+
+  <!-- =====================================================================
+       Game / Unity references — resolved from the install's Managed folder.
+       Private=false: compile against them, but never copy to output.
+       ===================================================================== -->
+  <ItemGroup>
+    <Reference Include="Assembly-CSharp">
+      <HintPath>$(GameLibsFolder)\Assembly-CSharp.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Assembly-CSharp-firstpass">
+      <HintPath>$(GameLibsFolder)\Assembly-CSharp-firstpass.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="0Harmony">
+      <HintPath>$(GameLibsFolder)\0Harmony.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine">
+      <HintPath>$(GameLibsFolder)\UnityEngine.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.CoreModule">
+      <HintPath>$(GameLibsFolder)\UnityEngine.CoreModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.UI">
+      <HintPath>$(GameLibsFolder)\UnityEngine.UI.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.UIModule">
+      <HintPath>$(GameLibsFolder)\UnityEngine.UIModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.IMGUIModule">
+      <HintPath>$(GameLibsFolder)\UnityEngine.IMGUIModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.InputLegacyModule">
+      <HintPath>$(GameLibsFolder)\UnityEngine.InputLegacyModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.TextRenderingModule">
+      <HintPath>$(GameLibsFolder)\UnityEngine.TextRenderingModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Unity.TextMeshPro">
+      <HintPath>$(GameLibsFolder)\Unity.TextMeshPro.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
+  <!-- Our source only (see EnableDefaultCompileItems=false above). -->
+  <ItemGroup>
+    <Compile Include="src\**\*.cs" />
+  </ItemGroup>
+
+  <!-- Ship the knowledge base as an embedded resource so it survives ILRepack
+       and needs no on-disk path juggling at runtime. -->
+  <ItemGroup>
+    <EmbeddedResource Include="milestones.yaml">
+      <LogicalName>NextStepGuide.milestones.yaml</LogicalName>
+    </EmbeddedResource>
+  </ItemGroup>
+
+  <!-- ILRepack is driven by the project-level ILRepack.targets file (which
+       suppresses the package's default auto-merge target). See that file. -->
+
+  <!-- =====================================================================
+       Deploy the built mod into the Klei Dev mods folder so it's testable
+       in-game on the next launch. Runs after the ILRepack merge. Skip with
+       -p:SkipDeploy=true (e.g. CI). milestones.yaml is embedded in the DLL,
+       so only the merged DLL + the two manifest yamls need to ship.
+       ===================================================================== -->
+  <Target Name="DeployToDevMods" AfterTargets="NextStepGuideILRepack"
+          Condition="'$(SkipDeploy)' != 'true' and '$(ModDeployFolder)' != ''">
+    <MakeDir Directories="$(ModDeployFolder)" />
+    <ItemGroup>
+      <DeployFiles Include="$(OutputPath)$(AssemblyName).dll" />
+      <DeployFiles Include="$(MSBuildProjectDirectory)\mod.yaml" />
+      <DeployFiles Include="$(MSBuildProjectDirectory)\mod_info.yaml" />
+    </ItemGroup>
+    <Copy SourceFiles="@(DeployFiles)" DestinationFolder="$(ModDeployFolder)" />
+    <Message Importance="high" Text="[NextStepGuide] Deployed to $(ModDeployFolder)" />
+  </Target>
+
+</Project>

@@ -1,0 +1,6 @@
+# Works with and without the Spaced Out! DLC.
+supportedContent: ALL
+# Built/verified against U59-737790 (Unity 6000.3.5f2). Lower bound = that build.
+minimumSupportedBuild: 737790
+version: "0.1.0"
+APIVersion: 2

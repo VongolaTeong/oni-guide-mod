@@ -1,0 +1,45 @@
+<Project>
+
+  <!-- =====================================================================
+       Presence of this file makes ILRepack.Lib.MSBuild.Task suppress BOTH its
+       default auto-merge target and its copy-local cleanup target, handing us
+       full control of the merge.
+
+       We fold ONLY PLib into NextStepGuide.dll (internalized) and point
+       LibraryPath at the game's Managed folder so PLib's references to
+       Newtonsoft.Json / YamlDotNet / Unity / Assembly-CSharp resolve there
+       WITHOUT being merged (the game already ships them at runtime).
+       ===================================================================== -->
+
+  <Target Name="NextStepGuideILRepack" AfterTargets="Build">
+    <PropertyGroup>
+      <MergedDll>$(OutputPath)$(TargetName)$(TargetExt)</MergedDll>
+    </PropertyGroup>
+
+    <ItemGroup>
+      <!-- First input is the primary assembly. -->
+      <ILMergeInput Include="$(OutputPath)$(TargetName)$(TargetExt)" />
+      <ILMergeInput Include="$(OutputPath)PLib.dll" />
+
+      <!-- Search dirs for references that must resolve but NOT be merged. -->
+      <ILMergeLib Include="$(OutputPath)" />
+      <ILMergeLib Include="$(GameLibsFolder)" />
+    </ItemGroup>
+
+    <Message Importance="high"
+             Text="[NextStepGuide] ILRepack: merging PLib into $(TargetName)$(TargetExt)" />
+
+    <ILRepack
+        Parallel="true"
+        DebugInfo="false"
+        Internalize="true"
+        InputAssemblies="@(ILMergeInput)"
+        LibraryPath="@(ILMergeLib)"
+        TargetKind="Dll"
+        OutputFile="$(MergedDll)" />
+
+    <!-- Only the merged primary should ship. -->
+    <Delete Files="$(OutputPath)PLib.dll" />
+  </Target>
+
+</Project>
