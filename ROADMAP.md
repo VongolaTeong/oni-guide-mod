@@ -20,11 +20,11 @@ Last updated: 2026-06-21 · Built against ONI **U59-737790** (Unity 6000.3.5f2, 
 | 1 | State layer: `ColonySnapshot` + `StateReader` (fail-soft) | ✅ |
 | 2 | Rules engine + 5 rules + YAML knowledge base (tested) | ✅ |
 | 3 | On-screen panel (collapsible, colour-coded) | ✅ |
-| 4 | Dismiss per tip + options menu | 🔜 |
-| 5 | Rule depth + the heavier state probes | 🧊 |
+| 4 | Dismiss per tip + options menu | ✅ |
+| 5 | Rule depth + the heavier state probes | 🔜 |
 | 6 | Polish, heat/space rules, Workshop release | 🧊 |
 
-**29 unit tests** pass (`cd test && dotnet test`); the build auto-deploys to the Klei Dev
+**30 unit tests** pass (`cd test && dotnet test`); the build auto-deploys to the Klei Dev
 mods folder (`dotnet build -c Release`).
 
 ---
@@ -59,9 +59,9 @@ mods folder (`dotnet build -c Release`).
 - **Design law:** progression advice gates on **structure** (did you build the next step?),
   never on current **stock** — resource levels only scale urgency. So a tip persists until you
   actually build the next step; a big finite-resource buffer just lowers its priority.
-- 29 xUnit tests cover every rule (fires/satisfied/irrelevant), engine ordering/dedupe/
-  gating/fail-soft, urgency scaling, and that the real YAML parses and stays consistent with
-  the code.
+- 30 xUnit tests cover every rule (fires/satisfied/irrelevant), engine ordering/dedupe/
+  dismiss/mute/fail-soft, urgency scaling, and that the real YAML parses and stays consistent
+  with the code.
 
 ### Phase 3 — On-screen panel
 - Collapsible card pinned to the left-centre of the HUD; click to collapse/expand.
@@ -70,20 +70,16 @@ mods folder (`dotnet build -c Release`).
   independently of the native HUD. Colour chip per tip by urgency band. Fail-soft: any UI
   exception logs and the panel goes quiet, never taking the HUD down.
 
----
-
-## 🔜 Next — Phase 4: Dismiss & options
-- Per-tip **✕ dismiss** → adds the rule id to a dismissed set; "reset dismissed" action.
-- **PLib options menu**: refresh interval, max tips shown (N), show-why inline toggle,
-  per-category mutes (some players never want morale/ranching nags).
-- Persist settings + dismissed ids via PLib's options/config.
-- Panel placement: make the corner/offset a setting (left-centre is the current default).
+### Phase 4 — Dismiss & options
+- Per-tip **`[x]` dismiss** (TMP `<link>` in the panel) → persisted dismissed set; a
+  **`[reset N dismissed]`** link brings them back. Dismiss/reset re-evaluate immediately.
+- **In-game Options dialog** (PLib): show-reasons toggle, max tips (1–8), refresh interval
+  (1–30s), and a **mute toggle per category** (filtered before the top-N cut). Persisted to
+  `config.json`; edits apply live via `IOptions.OnOptionsChanged` (no restart).
 
 ---
 
-## 🧊 Planned
-
-### Phase 5 — Rule depth + heavier probes
+## 🔜 Next — Phase 5: Rule depth + heavier probes
 Grow the rule set across the tiers in `milestones.yaml` (most have `status: draft` until the
 StateReader can detect them). The valuable mid-game "what now?" rules live here.
 

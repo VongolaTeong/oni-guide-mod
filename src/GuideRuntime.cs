@@ -1,17 +1,18 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Reflection;
+using NextStepGuide.Config;
 using NextStepGuide.Rules;
 using NextStepGuide.State;
+using PeterHan.PLib.Options;
 using UnityEngine;
 
 namespace NextStepGuide
 {
     /// <summary>
     /// Process-wide glue between the game-touching StateReader and the pure
-    /// RuleEngine. Owns the loaded library + engine and the latest evaluation
-    /// result. The UI (later phases) renders <see cref="Latest"/>; it never
+    /// RuleEngine. Owns the loaded library + engine, the user settings, and the
+    /// latest evaluation result. The UI renders <see cref="Latest"/>; it never
     /// reads game state itself.
     /// </summary>
     public static class GuideRuntime
@@ -21,20 +22,29 @@ namespace NextStepGuide
         public static ColonySnapshot LastSnapshot { get; private set; }
         public static IReadOnlyList<Recommendation> Latest { get; private set; } = new List<Recommendation>();
 
+        /// <summary>Live user settings (persisted via PLib).</summary>
+        public static GuideSettings Settings { get; private set; } = new GuideSettings();
+
         /// <summary>Bumped on every successful Recompute so the UI can skip redraws.</summary>
         public static int Version { get; private set; }
 
-        // Phase 4 will persist these via PLib options; defaults for now.
-        public static readonly HashSet<string> Dismissed = new HashSet<string>(StringComparer.Ordinal);
-        public static int MaxResults = 4;
-
         private static bool _initialised;
 
-        /// <summary>Load the knowledge base + wire the engine. Safe to call repeatedly.</summary>
+        /// <summary>Load settings + the knowledge base + wire the engine. Idempotent.</summary>
         public static void EnsureInitialised()
         {
             if (_initialised) return;
             _initialised = true;
+
+            try
+            {
+                Settings = POptions.ReadSettings<GuideSettings>() ?? new GuideSettings();
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning($"{ModEntry.Prefix} failed to read settings, using defaults: {e}");
+                Settings = new GuideSettings();
+            }
 
             try
             {
@@ -58,7 +68,8 @@ namespace NextStepGuide
             {
                 var snap = StateReader.BuildSnapshot();
                 LastSnapshot = snap;
-                Latest = Engine.Evaluate(snap, Dismissed, MaxResults);
+                Latest = Engine.Evaluate(snap, Settings.DismissedSet(),
+                                         Settings.MutedCategorySet(), Settings.MaxTips);
                 Version++;
 
                 if (logToConsole) LogResult(snap, Latest);
@@ -67,6 +78,58 @@ namespace NextStepGuide
             {
                 Debug.LogWarning($"{ModEntry.Prefix} Recompute failed: {e}");
             }
+        }
+
+        /// <summary>Hide a tip permanently (until reset). Persists + re-evaluates now.</summary>
+        public static void Dismiss(string id)
+        {
+            if (string.IsNullOrEmpty(id)) return;
+            if (Settings.DismissedIds == null) Settings.DismissedIds = new List<string>();
+            if (!Settings.DismissedIds.Contains(id))
+            {
+                Settings.DismissedIds.Add(id);
+                PersistSettings();
+                Recompute(logToConsole: false);
+            }
+        }
+
+        /// <summary>Bring back all dismissed tips. Persists + re-evaluates now.</summary>
+        public static void ResetDismissed()
+        {
+            if (Settings.DismissedIds != null && Settings.DismissedIds.Count > 0)
+            {
+                Settings.DismissedIds.Clear();
+                PersistSettings();
+                Recompute(logToConsole: false);
+            }
+        }
+
+        /// <summary>Adopt edited option values from the Options dialog (keeps dismissed state).</summary>
+        public static void ApplyOptionChanges(GuideSettings edited)
+        {
+            if (edited == null) return;
+            Settings.ShowWhy = edited.ShowWhy;
+            Settings.MaxTips = edited.MaxTips;
+            Settings.RefreshIntervalSeconds = edited.RefreshIntervalSeconds;
+            Settings.MuteOxygen = edited.MuteOxygen;
+            Settings.MutePower = edited.MutePower;
+            Settings.MuteFood = edited.MuteFood;
+            Settings.MuteWater = edited.MuteWater;
+            Settings.MuteSanitation = edited.MuteSanitation;
+            Settings.MuteHeat = edited.MuteHeat;
+            Settings.MuteMorale = edited.MuteMorale;
+            Settings.MuteResearch = edited.MuteResearch;
+            Settings.MuteIndustry = edited.MuteIndustry;
+            Settings.MuteExploration = edited.MuteExploration;
+            Settings.MuteSpace = edited.MuteSpace;
+            Settings.MuteDupes = edited.MuteDupes;
+            Recompute(logToConsole: false);
+        }
+
+        private static void PersistSettings()
+        {
+            try { POptions.WriteSettings(Settings); }
+            catch (Exception e) { Debug.LogWarning($"{ModEntry.Prefix} failed to save settings: {e}"); }
         }
 
         private static void LogResult(ColonySnapshot s, IReadOnlyList<Recommendation> recs)

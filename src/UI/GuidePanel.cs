@@ -6,6 +6,7 @@ using NextStepGuide.State;
 using PeterHan.PLib.UI;
 using TMPro;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
 namespace NextStepGuide.UI
@@ -86,12 +87,7 @@ namespace NextStepGuide.UI
 
                 var bg = root.AddComponent<Image>();
                 bg.color = new Color(0.07f, 0.09f, 0.12f, 0.92f);
-
-                // Click anywhere on the card toggles collapse.
-                var button = root.AddComponent<Button>();
-                button.transition = Selectable.Transition.None;
-                button.targetGraphic = bg;
-                button.onClick.AddListener(ToggleCollapse);
+                bg.raycastTarget = true; // block clicks to the game behind the card
 
                 // Auto-size the card to its text.
                 var vlg = root.AddComponent<VerticalLayoutGroup>();
@@ -112,11 +108,15 @@ namespace NextStepGuide.UI
                 textGO.AddComponent<RectTransform>();
                 _text = textGO.AddComponent<TextMeshProUGUI>();
                 ApplyFont(_text);
-                _text.raycastTarget = false; // let the card receive the click
+                _text.raycastTarget = true; // receives toggle/dismiss/reset link clicks
                 _text.alignment = TextAlignmentOptions.TopLeft;
                 _text.textWrappingMode = TextWrappingModes.NoWrap; // we wrap manually
                 _text.richText = true;
                 _text.text = "Reading colony...";
+
+                var clicks = textGO.AddComponent<GuidePanelClicks>();
+                clicks.Owner = this;
+                clicks.Text = _text;
 
                 _root = root;
                 Render(GuideRuntime.LastSnapshot, GuideRuntime.Latest);
@@ -157,14 +157,17 @@ namespace NextStepGuide.UI
             {
                 if (_text == null) return;
                 recs = recs ?? Array.Empty<Recommendation>();
+                bool showWhy = GuideRuntime.Settings == null || GuideRuntime.Settings.ShowWhy;
 
                 string cycle = (snapshot != null && snapshot.CycleKnown) ? snapshot.Cycle.ToString() : "?";
                 string toggle = _collapsed ? "[+]" : "[-]";
                 string tips = recs.Count == 1 ? "1 tip" : recs.Count + " tips";
 
                 var sb = new StringBuilder();
-                sb.Append("<b>").Append(toggle).Append(" Next Step Guide</b>  <color=#")
-                  .Append(PolishHex).Append(">(Cycle ").Append(cycle).Append(", ").Append(tips).Append(")</color>");
+                // Header: the toggle box + title is a clickable collapse link.
+                sb.Append("<link=\"toggle\"><b>").Append(toggle).Append(" Next Step Guide</b></link>")
+                  .Append("  <color=#").Append(PolishHex).Append(">(Cycle ").Append(cycle)
+                  .Append(", ").Append(tips).Append(")</color>");
 
                 if (!_collapsed)
                 {
@@ -179,10 +182,23 @@ namespace NextStepGuide.UI
                         {
                             var r = recs[i];
                             sb.Append("\n\n<color=#").Append(BandHex(r.Band)).Append(">*</color> <b>")
-                              .Append(WrapIndented(r.Title, "  ")).Append("</b>");
-                            sb.Append("\n<size=85%><color=#").Append(WhyHex).Append('>')
-                              .Append(WrapIndented(r.Why, "  ")).Append("</color></size>");
+                              .Append(WrapIndented(r.Title, "  ")).Append("</b>")
+                              // per-tip dismiss link
+                              .Append(" <link=\"d:").Append(r.Id).Append("\"><color=#")
+                              .Append(PolishHex).Append(">[x]</color></link>");
+                            if (showWhy)
+                            {
+                                sb.Append("\n<size=85%><color=#").Append(WhyHex).Append('>')
+                                  .Append(WrapIndented(r.Why, "  ")).Append("</color></size>");
+                            }
                         }
+                    }
+
+                    int dismissedCount = GuideRuntime.Settings?.DismissedIds?.Count ?? 0;
+                    if (dismissedCount > 0)
+                    {
+                        sb.Append("\n\n<size=80%><link=\"reset\"><color=#").Append(PolishHex)
+                          .Append(">[reset ").Append(dismissedCount).Append(" dismissed]</color></link></size>");
                     }
                 }
 
@@ -192,6 +208,16 @@ namespace NextStepGuide.UI
             {
                 Debug.LogWarning($"{ModEntry.Prefix} panel render failed: {e}");
             }
+        }
+
+        /// <summary>Dispatch a clicked TMP link id (toggle / dismiss / reset).</summary>
+        internal void OnLinkClicked(string id)
+        {
+            if (string.IsNullOrEmpty(id)) return;
+            if (id == "toggle") { ToggleCollapse(); return; }
+            if (id == "reset") GuideRuntime.ResetDismissed();
+            else if (id.StartsWith("d:", StringComparison.Ordinal)) GuideRuntime.Dismiss(id.Substring(2));
+            Render(GuideRuntime.LastSnapshot, GuideRuntime.Latest);
         }
 
         /// <summary>Word-wrap to <see cref="WrapWidth"/> and indent continuation lines.</summary>
@@ -234,6 +260,32 @@ namespace NextStepGuide.UI
                 case UrgencyBand.Pressing: return PressingHex;
                 case UrgencyBand.Progress: return ProgressHex;
                 default: return PolishHex;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Routes clicks on the panel text to the TMP link under the cursor
+    /// (toggle / dismiss / reset). Lives on the text GameObject.
+    /// </summary>
+    internal sealed class GuidePanelClicks : MonoBehaviour, IPointerClickHandler
+    {
+        public GuidePanel Owner;
+        public TextMeshProUGUI Text;
+
+        public void OnPointerClick(PointerEventData eventData)
+        {
+            try
+            {
+                if (Text == null || Owner == null) return;
+                // null camera = screen-space-overlay canvas.
+                int idx = TMP_TextUtilities.FindIntersectingLink(Text, eventData.position, null);
+                if (idx < 0) return;
+                Owner.OnLinkClicked(Text.textInfo.linkInfo[idx].GetLinkID());
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning($"{ModEntry.Prefix} panel click failed: {e}");
             }
         }
     }

@@ -37,6 +37,7 @@ namespace NextStepGuide.Rules
         public List<Recommendation> Evaluate(
             ColonySnapshot snapshot,
             ISet<string> dismissed = null,
+            ISet<RuleCategory> mutedCategories = null,
             int maxResults = 4)
         {
             var fired = new List<Recommendation>();
@@ -47,6 +48,9 @@ namespace NextStepGuide.Rules
                 var def = _library.Get(rule.Id);
                 if (def == null || !def.IsActive) continue;                  // unknown/draft
                 if (dismissed != null && dismissed.Contains(rule.Id)) continue;
+                // Muting is applied here, BEFORE the top-N cut, so a muted tip
+                // never occupies a slot that a real recommendation could fill.
+                if (mutedCategories != null && mutedCategories.Contains(def.CategoryEnum)) continue;
                 if (!DlcAllows(def, snapshot)) continue;
                 if (!DependenciesMet(def, snapshot)) continue;
 

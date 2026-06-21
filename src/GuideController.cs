@@ -12,8 +12,8 @@ namespace NextStepGuide
     /// </summary>
     public sealed class GuideController : MonoBehaviour
     {
-        private const float RefreshSeconds = 3f;
-        private readonly Throttle _throttle = new Throttle(RefreshSeconds);
+        private Throttle _throttle = new Throttle(3f);
+        private float _throttleInterval = 3f;
         private int _lastRenderedVersion = -1;
 
         private void Start()
@@ -26,6 +26,14 @@ namespace NextStepGuide
         {
             // Create the panel as soon as the HUD canvas exists (retries each tick).
             GuidePanel.EnsureCreated();
+
+            // Honour the user's configured refresh interval (rebuild the gate if it changed).
+            float interval = GuideRuntime.Settings != null ? GuideRuntime.Settings.RefreshIntervalSeconds : 3f;
+            if (Mathf.Abs(interval - _throttleInterval) > 0.01f)
+            {
+                _throttleInterval = interval;
+                _throttle = new Throttle(interval);
+            }
 
             // Recompute on the throttle, but not while paused (display stays put).
             if (_throttle.Ready(Time.unscaledTime) && !IsPaused())

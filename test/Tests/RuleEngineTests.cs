@@ -64,6 +64,21 @@ namespace NextStepGuide.Tests
         }
 
         [Fact]
+        public void MutedCategory_IsFiltered_BeforeTopN()
+        {
+            var muted = new HashSet<RuleCategory> { RuleCategory.Oxygen };
+            var recs = Kb.Engine().Evaluate(Snap.Fresh(), dismissed: null, mutedCategories: muted);
+            var ids = Ids(recs);
+
+            // No Oxygen-category tips survive the mute...
+            Assert.DoesNotContain("oxygen.source", ids);
+            Assert.All(recs, r => Assert.NotEqual(RuleCategory.Oxygen, r.Category));
+            // ...but other categories still come through.
+            Assert.Contains("sanitation.toilet", ids);
+            Assert.Contains("food.basic_farm", ids);
+        }
+
+        [Fact]
         public void Dependencies_GateUntilPrerequisiteSolved()
         {
             // oxygen.electrolyzer depends_on oxygen.source. With NO oxygen building

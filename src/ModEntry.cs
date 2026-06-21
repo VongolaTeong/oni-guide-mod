@@ -1,6 +1,8 @@
 using HarmonyLib;
 using KMod;
+using NextStepGuide.Config;
 using PeterHan.PLib.Core;
+using PeterHan.PLib.Options;
 using UnityEngine;
 
 namespace NextStepGuide
@@ -21,8 +23,9 @@ namespace NextStepGuide
             base.OnLoad(harmony);
 
             PUtil.InitLibrary(false);
+            new POptions().RegisterOptions(this, typeof(GuideSettings));
 
-            Debug.Log($"{Prefix} v0.1.0 loaded — Harmony patches applied " +
+            Debug.Log($"{Prefix} v0.1.0 loaded — Harmony patches applied, options registered " +
                       "(built against U59-737790, Unity 6000.3.5f2).");
         }
     }
