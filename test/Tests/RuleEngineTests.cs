@@ -1,0 +1,104 @@
+using System.Collections.Generic;
+using System.Linq;
+using NextStepGuide.Rules;
+using NextStepGuide.State;
+using Xunit;
+
+namespace NextStepGuide.Tests
+{
+    public class RuleEngineTests
+    {
+        private static List<string> Ids(IEnumerable<Recommendation> recs)
+            => recs.Select(r => r.Id).ToList();
+
+        [Fact]
+        public void FreshBase_SurfacesSurvivalGaps_OrderedByUrgency()
+        {
+            var recs = Kb.Engine().Evaluate(Snap.Fresh());
+            var ids = Ids(recs);
+
+            Assert.Contains("oxygen.source", ids);
+            Assert.Contains("sanitation.toilet", ids);
+            Assert.Contains("food.basic_farm", ids);
+
+            // research needs a basic station; electrolyzer needs a diffuser — neither here.
+            Assert.DoesNotContain("research.early_stations", ids);
+            Assert.DoesNotContain("oxygen.electrolyzer", ids);
+
+            // Strictly non-increasing urgency.
+            for (int i = 1; i < recs.Count; i++)
+                Assert.True(recs[i - 1].Urgency >= recs[i].Urgency);
+
+            // oxygen.source (96) is the most urgent of the three.
+            Assert.Equal("oxygen.source", recs[0].Id);
+        }
+
+        [Fact]
+        public void SolvedBase_SurfacesNothing()
+        {
+            var s = Snap.Fresh()
+                .With(Prefabs.Electrolyzer)
+                .With(Prefabs.FlushToilet)
+                .With(Prefabs.FarmTile);
+
+            var recs = Kb.Engine().Evaluate(s);
+            Assert.Empty(recs);
+        }
+
+        [Fact]
+        public void MaxResults_IsRespected()
+        {
+            var recs = Kb.Engine().Evaluate(Snap.Fresh(), maxResults: 2);
+            Assert.Equal(2, recs.Count);
+            Assert.Equal("oxygen.source", recs[0].Id); // top two by urgency
+            Assert.Equal("sanitation.toilet", recs[1].Id);
+        }
+
+        [Fact]
+        public void Dismissed_Ids_AreExcluded()
+        {
+            var dismissed = new HashSet<string> { "oxygen.source" };
+            var recs = Kb.Engine().Evaluate(Snap.Fresh(), dismissed);
+            Assert.DoesNotContain("oxygen.source", Ids(recs));
+            Assert.Contains("sanitation.toilet", Ids(recs));
+        }
+
+        [Fact]
+        public void Dependencies_GateUntilPrerequisiteSolved()
+        {
+            // oxygen.electrolyzer depends_on oxygen.source. With NO oxygen building
+            // at all, oxygen.source is an open problem, so even a contrived low-algae
+            // state must not surface the electrolyzer advice (and there's no diffuser
+            // anyway). Once a diffuser exists, oxygen.source is satisfied and the
+            // electrolyzer nudge can appear.
+            var noOxygen = Snap.Fresh().WithResource(Elements.Algae, 50);
+            Assert.DoesNotContain("oxygen.electrolyzer", Ids(Kb.Engine().Evaluate(noOxygen)));
+
+            var onDiffusers = Snap.Fresh().With(Prefabs.OxygenDiffuser).WithResource(Elements.Algae, 50);
+            Assert.Contains("oxygen.electrolyzer", Ids(Kb.Engine().Evaluate(onDiffusers)));
+        }
+
+        [Fact]
+        public void CategoryCollapse_KeepsAtMostOnePerCategory()
+        {
+            // Force a contrived double-fire by disabling category collapse and
+            // comparing counts isn't possible with mutually-exclusive oxygen rules,
+            // so assert the property directly: no two recommendations share a category.
+            var recs = Kb.Engine().Evaluate(Snap.Fresh());
+            var categories = recs.Select(r => r.Category).ToList();
+            Assert.Equal(categories.Count, categories.Distinct().Count());
+        }
+
+        [Fact]
+        public void UnknownProbes_ProduceNoAdvice()
+        {
+            // A snapshot where building data failed to read must not fire
+            // building-count rules (fail-soft: silence, not false positives).
+            var s = Snap.Fresh();
+            s.BuildingsKnown = false;
+            var recs = Kb.Engine().Evaluate(s);
+            Assert.DoesNotContain("oxygen.source", Ids(recs));
+            Assert.DoesNotContain("sanitation.toilet", Ids(recs));
+        }
+    }
+}

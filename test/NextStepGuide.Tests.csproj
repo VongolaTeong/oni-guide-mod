@@ -1,0 +1,41 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- net9.0 matches the installed runtime; the pure source under test is
+         TFM-agnostic. The game-touching layers are excluded below. -->
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <IsPackable>false</IsPackable>
+    <LangVersion>latest</LangVersion>
+    <!-- This project pulls in YamlDotNet from NuGet; Directory.Build.props at the
+         repo root only configures game paths, which we don't need here. -->
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
+    <PackageReference Include="xunit" Version="2.9.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
+    <PackageReference Include="YamlDotNet" Version="13.7.1" />
+  </ItemGroup>
+
+  <!-- Compile ONLY the pure (game-free) source. Anything touching UnityEngine /
+       game singletons (StateReader, GuideRuntime, GuideController, ModEntry,
+       Patches) is deliberately excluded so tests run without the game. -->
+  <ItemGroup>
+    <Compile Include="..\src\State\ColonySnapshot.cs" />
+    <Compile Include="..\src\State\Prefabs.cs" />
+    <Compile Include="..\src\State\Elements.cs" />
+    <Compile Include="..\src\Rules\**\*.cs" />
+    <Compile Include="..\src\Util\Throttle.cs" />
+    <Compile Include="Tests\**\*.cs" />
+  </ItemGroup>
+
+  <!-- The real knowledge base, copied next to the test binary so the loader
+       test validates the SAME content the mod embeds. -->
+  <ItemGroup>
+    <None Include="..\milestones.yaml" CopyToOutputDirectory="PreserveNewest" Link="milestones.yaml" />
+  </ItemGroup>
+
+</Project>
