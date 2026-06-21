@@ -1,0 +1,18 @@
+# Build output
+bin/
+obj/
+*.user
+!Directory.Build.props.user.example
+
+# Machine-specific game path override (each dev creates their own)
+Directory.Build.props.user
+
+# IDE
+.vs/
+.idea/
+*.suo
+*.userprefs
+
+# NuGet
+*.nupkg
+packages/
