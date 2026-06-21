@@ -242,6 +242,25 @@ milestones:
     source: "ESC 150-cycle guide; ONI wiki oxygen"
     notes: "PROGRESSION rule: persists until an electrolyzer exists; a big algae buffer does NOT hide it. Urgency ramps ~38 (plenty of algae, plan ahead) -> ~89 (algae nearly gone). See PHILOSOPHY: structure gates, stock scales."
 
+  - id: sanitation.lavatory
+    category: Sanitation
+    tier: stabilization
+    title: "Upgrade outhouses to Flush Toilets"
+    why: "Flush toilets are far more hygienic than outhouses, never need raking, and feed the water loop. Once you've got research going, plumb a proper bathroom (toilet + sink)."
+    soft_cycle: [15, 50]
+    urgency_base: 38
+    trigger:
+      when: "the base is established (research running) but still relies on Outhouses"
+      state_hints:
+        - "a Research Station exists (past the opening survival phase)"
+        - "an Outhouse exists and no Flush Toilet does"
+    satisfied_when: "Flush Toilets have replaced the outhouses"
+    depends_on: [sanitation.toilet]
+    dlc: any
+    status: active
+    source: "ONI wiki Getting Started; community early-base progression"
+    notes: "Gated on a Research Station so it never nags a cycle-3 base; an outhouse-only playstyle can dismiss it."
+
   - id: water.sieve
     category: Water
     tier: stabilization
@@ -279,6 +298,25 @@ milestones:
     status: draft
     source: "ESC 150-cycle guide"
     notes: "Localized-gas detection needs region sampling; keep draft until that's available."
+
+  - id: food.cooked
+    category: Food
+    tier: stabilization
+    title: "Cook your food in a kitchen"
+    why: "Raw crops give few calories and low morale. An Electric Grill or Microbe Musher turns them into proper meals — more calories per plant and a morale boost from quality food."
+    soft_cycle: [12, 50]
+    urgency_base: 44
+    trigger:
+      when: "a farm is running but there's no cooking station, so dupes eat raw produce"
+      state_hints:
+        - "a farm exists (Planter Box / Farm Tile)"
+        - "count of Microbe Musher + Electric Grill + Gas Range == 0"
+    satisfied_when: "a cooking station is preparing meals"
+    depends_on: [food.basic_farm]
+    dlc: any
+    status: active
+    source: "ESC 150-cycle guide; ONI wiki food quality"
+    notes: "A concrete small win between the first farm and a sustainable crop — fills the early->mid gap."
 
   - id: food.sustainable
     category: Food

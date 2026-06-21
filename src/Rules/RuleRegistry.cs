@@ -20,6 +20,13 @@ namespace NextStepGuide.Rules
 
             // Stabilization
             new ElectrolyzerTransitionRule(),
+            new PowerCoalRule(),
+            new CookFoodRule(),
+            new WaterSieveRule(),
+            new LavatoryUpgradeRule(),
+
+            // Infrastructure
+            new MetalRefineryRule(),
         };
     }
 }

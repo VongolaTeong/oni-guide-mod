@@ -25,14 +25,35 @@ namespace NextStepGuide.State
         public const string FarmTile = "FarmTile";
         public const string HydroponicFarm = "HydroponicFarm";
 
+        // Cooking (raw crops -> proper meals)
+        public const string MicrobeMusher = "MicrobeMusher";
+        public const string ElectricGrill = "CookingStation";               // "Electric Grill"
+        public const string GourmetCookingStation = "GourmetCookingStation"; // "Gas Range"
+
+        // Water
+        public const string WaterSieve = "WaterPurifier";                   // "Water Sieve"
+        public const string WashBasin = "WashBasin";
+
         // Research
         public const string ResearchCenter = "ResearchCenter";                 // Research Station (tier 1)
         public const string AdvancedResearchCenter = "AdvancedResearchCenter"; // Super Computer (tier 2)
         public const string CosmicResearchCenter = "CosmicResearchCenter";     // space research
 
-        // Power (reserved for later rules)
-        public const string ManualGenerator = "ManualGenerator";
+        // Power
+        // GOTCHA: the Coal Generator's prefab id is "Generator" (not "CoalGenerator"),
+        // and the Natural Gas Generator's is "MethaneGenerator". Verified U59-737790.
+        public const string ManualGenerator = "ManualGenerator";       // hand-cranked
         public const string CoalGenerator = "Generator";
+        public const string WoodGasGenerator = "WoodGasGenerator";     // Wood Burner
+        public const string HydrogenGenerator = "HydrogenGenerator";
+        public const string NaturalGasGenerator = "MethaneGenerator";  // "Natural Gas Generator"
+        public const string PetroleumGenerator = "PetroleumGenerator";
+        public const string SteamTurbine = "SteamTurbine";
+        public const string SolarPanel = "SolarPanel";
+
+        // Industry
+        public const string MetalRefinery = "MetalRefinery";
+        public const string PolymerPress = "Polymerizer";              // "Polymer Press"
 
         // ---- Convenience groupings used by rules ----
         public static readonly string[] OxygenSources =
@@ -43,5 +64,18 @@ namespace NextStepGuide.State
 
         public static readonly string[] Farms =
             { PlanterBox, FarmTile, HydroponicFarm };
+
+        public static readonly string[] CookingStations =
+            { MicrobeMusher, ElectricGrill, GourmetCookingStation };
+
+        /// <summary>
+        /// Any power source that runs without a dupe hand-cranking it — i.e. the
+        /// player has automated power. Used to decide both "move off Manual
+        /// Generators" and "the base has real power, ready for a Metal Refinery".
+        /// Deliberately excludes <see cref="ManualGenerator"/>.
+        /// </summary>
+        public static readonly string[] AutomatedGenerators =
+            { CoalGenerator, WoodGasGenerator, HydrogenGenerator, NaturalGasGenerator,
+              PetroleumGenerator, SteamTurbine, SolarPanel };
     }
 }

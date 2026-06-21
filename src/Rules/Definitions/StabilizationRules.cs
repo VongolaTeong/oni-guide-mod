@@ -52,4 +52,97 @@ namespace NextStepGuide.Rules.Definitions
             return Scale(t, 38, 89);
         }
     }
+
+    /// <summary>
+    /// power.coal — the colony still runs on hand-cranked Manual Generators and
+    /// hasn't built any automated power source yet. PROGRESSION RULE: it gates on
+    /// STRUCTURE (a Manual Generator exists, no automated generator does), never on
+    /// a power-Watt measurement — so the nudge persists from the moment you're on
+    /// manual power until you actually automate it.
+    ///
+    /// Requiring a Manual Generator to be present keeps it precise: a brand-new
+    /// base with no power at all is the survival "add power" case (power.basic),
+    /// not this "move OFF manual" one. Satisfied by ANY automated generator
+    /// (coal/wood/hydrogen/gas/petroleum/turbine/solar) so a player who jumped
+    /// straight past coal is never told to "move to coal generators".
+    ///
+    /// Urgency stays at the milestone baseline for now; once the StateReader can
+    /// read circuit load it can ramp up when consumption outpaces a single dupe's
+    /// cranking. (CLAUDE.md §5 power probe — Phase 5 follow-up.)
+    /// </summary>
+    public sealed class PowerCoalRule : RuleBase
+    {
+        public override string Id => "power.coal";
+
+        public override bool IsRelevant(ColonySnapshot s)
+        {
+            if (!s.DuplicantsKnown || s.LiveDuplicants <= 0) return false;
+            if (!s.BuildingsKnown) return false;
+
+            return s.HasAnyBuilding(Prefabs.ManualGenerator)
+                && !s.HasAnyBuilding(Prefabs.AutomatedGenerators);
+        }
+
+        public override bool IsSatisfied(ColonySnapshot s)
+            => s.HasAnyBuilding(Prefabs.AutomatedGenerators);
+    }
+
+    /// <summary>
+    /// food.cooked — a farm is running but nothing cooks the harvest. A concrete
+    /// small win between "start a farm" and "move to a sustainable crop": cooking
+    /// raises calories-per-plant and morale. Gated on a farm existing (there's
+    /// food to cook) so it never fires before the player has any crops.
+    /// </summary>
+    public sealed class CookFoodRule : RuleBase
+    {
+        public override string Id => "food.cooked";
+
+        public override bool IsRelevant(ColonySnapshot s)
+            => s.DuplicantsKnown && s.LiveDuplicants > 0 && s.BuildingsKnown
+               && s.HasAnyBuilding(Prefabs.Farms)
+               && !s.HasAnyBuilding(Prefabs.CookingStations);
+
+        public override bool IsSatisfied(ColonySnapshot s)
+            => s.HasAnyBuilding(Prefabs.CookingStations);
+    }
+
+    /// <summary>
+    /// water.sieve — a Flush Toilet (a polluted-water source) is running but no
+    /// Water Sieve recycles its output. Keys off the Flush Toilet specifically:
+    /// an outhouse-only base produces Polluted Dirt, not Polluted Water, so it
+    /// has nothing to sieve yet — keeping this precise.
+    /// </summary>
+    public sealed class WaterSieveRule : RuleBase
+    {
+        public override string Id => "water.sieve";
+
+        public override bool IsRelevant(ColonySnapshot s)
+            => s.DuplicantsKnown && s.LiveDuplicants > 0 && s.BuildingsKnown
+               && s.HasAnyBuilding(Prefabs.FlushToilet)
+               && !s.HasAnyBuilding(Prefabs.WaterSieve);
+
+        public override bool IsSatisfied(ColonySnapshot s)
+            => s.HasAnyBuilding(Prefabs.WaterSieve);
+    }
+
+    /// <summary>
+    /// sanitation.lavatory — the base is established (a Research Station exists)
+    /// but still runs purely on Outhouses. Nudges the upgrade to Flush Toilets.
+    /// The Research-Station gate keeps it out of the opening survival phase, where
+    /// outhouses are the correct choice; once a player has both an outhouse and a
+    /// flush toilet (mid-transition) it goes quiet.
+    /// </summary>
+    public sealed class LavatoryUpgradeRule : RuleBase
+    {
+        public override string Id => "sanitation.lavatory";
+
+        public override bool IsRelevant(ColonySnapshot s)
+            => s.DuplicantsKnown && s.LiveDuplicants > 0 && s.BuildingsKnown
+               && s.HasAnyBuilding(Prefabs.ResearchCenter)   // established-base gate
+               && s.HasAnyBuilding(Prefabs.Outhouse)
+               && !s.HasAnyBuilding(Prefabs.FlushToilet);
+
+        public override bool IsSatisfied(ColonySnapshot s)
+            => s.HasAnyBuilding(Prefabs.FlushToilet);
+    }
 }

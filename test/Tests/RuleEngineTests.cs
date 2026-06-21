@@ -36,10 +36,14 @@ namespace NextStepGuide.Tests
         [Fact]
         public void SolvedBase_SurfacesNothing()
         {
+            // A base that has covered every active rule's next step: oxygen
+            // (electrolyzer), a toilet, a farm, a kitchen, and a water sieve.
             var s = Snap.Fresh()
                 .With(Prefabs.Electrolyzer)
                 .With(Prefabs.FlushToilet)
-                .With(Prefabs.FarmTile);
+                .With(Prefabs.FarmTile)
+                .With(Prefabs.MicrobeMusher)   // satisfies food.cooked
+                .With(Prefabs.WaterSieve);     // satisfies water.sieve
 
             var recs = Kb.Engine().Evaluate(s);
             Assert.Empty(recs);
@@ -91,6 +95,30 @@ namespace NextStepGuide.Tests
 
             var onDiffusers = Snap.Fresh().With(Prefabs.OxygenDiffuser).WithResource(Elements.Algae, 50);
             Assert.Contains("oxygen.electrolyzer", Ids(Kb.Engine().Evaluate(onDiffusers)));
+        }
+
+        [Fact]
+        public void StabilizedBase_HandsOff_FromPowerToRefinery()
+        {
+            // Survival is solved (O2/toilet/food) and the base runs on Manual
+            // Generators -> the next step is "move off manual power"; it's too
+            // early to nag about a Metal Refinery you can't run on hand-cranks.
+            var manualBase = Snap.Fresh()
+                .With(Prefabs.Electrolyzer).With(Prefabs.FlushToilet).With(Prefabs.FarmTile)
+                .With(Prefabs.ManualGenerator);
+            var manualIds = Ids(Kb.Engine().Evaluate(manualBase));
+            Assert.Contains("power.coal", manualIds);
+            Assert.DoesNotContain("industry.refined_metal", manualIds);
+
+            // Once power is automated, "move off manual" is solved and "build a
+            // Metal Refinery" becomes the next step (its depends_on power.coal is
+            // now met because power.coal is no longer an open problem).
+            var poweredBase = Snap.Fresh()
+                .With(Prefabs.Electrolyzer).With(Prefabs.FlushToilet).With(Prefabs.FarmTile)
+                .With(Prefabs.CoalGenerator);
+            var poweredIds = Ids(Kb.Engine().Evaluate(poweredBase));
+            Assert.DoesNotContain("power.coal", poweredIds);
+            Assert.Contains("industry.refined_metal", poweredIds);
         }
 
         [Fact]

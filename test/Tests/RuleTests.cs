@@ -141,5 +141,135 @@ namespace NextStepGuide.Tests
             Assert.InRange(uLow, 1, 89);
             Assert.True(uHigh >= def.UrgencyBase);
         }
+
+        // ---- power.coal (progression: structure-gated) ---------------------
+
+        [Fact]
+        public void PowerCoal_Irrelevant_WithNoGeneratorsAtAll()
+        {
+            // No power yet is the survival "add power" case, not "move off manual".
+            var r = new PowerCoalRule();
+            Assert.False(r.IsRelevant(Snap.Fresh()));
+        }
+
+        [Fact]
+        public void PowerCoal_Fires_OnManualOnly_ThenSatisfiedWhenAutomated()
+        {
+            var r = new PowerCoalRule();
+
+            var manualOnly = Snap.Fresh().With(Prefabs.ManualGenerator);
+            Assert.True(r.IsRelevant(manualOnly));
+            Assert.False(r.IsSatisfied(manualOnly));
+
+            var automated = Snap.Fresh().With(Prefabs.ManualGenerator).With(Prefabs.CoalGenerator);
+            Assert.True(r.IsSatisfied(automated));
+            Assert.False(r.IsRelevant(automated));
+        }
+
+        [Fact]
+        public void PowerCoal_Satisfied_ByAnyAutomatedGenerator_EvenSkippingCoal()
+        {
+            // A player who jumped straight to petroleum must never be told to
+            // "move to coal generators".
+            var r = new PowerCoalRule();
+            Assert.True(r.IsSatisfied(Snap.Fresh().With(Prefabs.PetroleumGenerator)));
+            Assert.True(r.IsSatisfied(Snap.Fresh().With(Prefabs.SolarPanel)));
+            Assert.False(r.IsRelevant(Snap.Fresh().With(Prefabs.ManualGenerator).With(Prefabs.SolarPanel)));
+        }
+
+        // ---- industry.refined_metal (progression: structure-gated) ---------
+
+        [Fact]
+        public void MetalRefinery_Irrelevant_BeforeAutomatedPower()
+        {
+            // Don't tell a cycle-1 base to build a 1200W refinery it can't run.
+            var r = new MetalRefineryRule();
+            Assert.False(r.IsRelevant(Snap.Fresh()));
+            Assert.False(r.IsRelevant(Snap.Fresh().With(Prefabs.ManualGenerator)));
+        }
+
+        [Fact]
+        public void MetalRefinery_Fires_WithPowerButNoRefinery_ThenSatisfied()
+        {
+            var r = new MetalRefineryRule();
+
+            var powered = Snap.Fresh().With(Prefabs.CoalGenerator);
+            Assert.True(r.IsRelevant(powered));
+            Assert.False(r.IsSatisfied(powered));
+
+            var withRefinery = Snap.Fresh().With(Prefabs.CoalGenerator).With(Prefabs.MetalRefinery);
+            Assert.True(r.IsSatisfied(withRefinery));
+            Assert.False(r.IsRelevant(withRefinery));
+        }
+
+        // ---- food.cooked (gap-filler) --------------------------------------
+
+        [Fact]
+        public void CookFood_Irrelevant_WithoutAFarm()
+        {
+            // Nothing to cook before there's a farm.
+            var r = new CookFoodRule();
+            Assert.False(r.IsRelevant(Snap.Fresh()));
+        }
+
+        [Fact]
+        public void CookFood_Fires_WithFarmButNoKitchen_ThenSatisfied()
+        {
+            var r = new CookFoodRule();
+
+            var farmNoKitchen = Snap.Fresh().With(Prefabs.FarmTile);
+            Assert.True(r.IsRelevant(farmNoKitchen));
+            Assert.False(r.IsSatisfied(farmNoKitchen));
+
+            Assert.True(r.IsSatisfied(Snap.Fresh().With(Prefabs.FarmTile).With(Prefabs.MicrobeMusher)));
+            Assert.True(r.IsSatisfied(Snap.Fresh().With(Prefabs.FarmTile).With(Prefabs.ElectricGrill)));
+        }
+
+        // ---- water.sieve (gap-filler) --------------------------------------
+
+        [Fact]
+        public void WaterSieve_Irrelevant_OnOuthouseOnlyBase()
+        {
+            // Outhouses make polluted DIRT, not polluted water — nothing to sieve.
+            var r = new WaterSieveRule();
+            Assert.False(r.IsRelevant(Snap.Fresh().With(Prefabs.Outhouse)));
+        }
+
+        [Fact]
+        public void WaterSieve_Fires_WithFlushToiletButNoSieve_ThenSatisfied()
+        {
+            var r = new WaterSieveRule();
+
+            var flushNoSieve = Snap.Fresh().With(Prefabs.FlushToilet);
+            Assert.True(r.IsRelevant(flushNoSieve));
+            Assert.False(r.IsSatisfied(flushNoSieve));
+
+            Assert.True(r.IsSatisfied(Snap.Fresh().With(Prefabs.FlushToilet).With(Prefabs.WaterSieve)));
+        }
+
+        // ---- sanitation.lavatory (gap-filler) ------------------------------
+
+        [Fact]
+        public void Lavatory_Irrelevant_BeforeResearchOrWithFlushToilet()
+        {
+            var r = new LavatoryUpgradeRule();
+            // Outhouse but no research station yet -> too early to nag the upgrade.
+            Assert.False(r.IsRelevant(Snap.Fresh().With(Prefabs.Outhouse)));
+            // Already has a flush toilet -> no longer outhouse-only.
+            Assert.False(r.IsRelevant(Snap.Fresh().With(Prefabs.ResearchCenter)
+                                                  .With(Prefabs.Outhouse).With(Prefabs.FlushToilet)));
+        }
+
+        [Fact]
+        public void Lavatory_Fires_OnEstablishedOuthouseOnlyBase_ThenSatisfied()
+        {
+            var r = new LavatoryUpgradeRule();
+
+            var outhouseOnly = Snap.Fresh().With(Prefabs.ResearchCenter).With(Prefabs.Outhouse);
+            Assert.True(r.IsRelevant(outhouseOnly));
+            Assert.False(r.IsSatisfied(outhouseOnly));
+
+            Assert.True(r.IsSatisfied(Snap.Fresh().With(Prefabs.Outhouse).With(Prefabs.FlushToilet)));
+        }
     }
 }
