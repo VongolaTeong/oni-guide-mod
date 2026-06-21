@@ -1,0 +1,655 @@
+# =============================================================================
+# milestones.yaml  —  ONI "Next Step" guidance knowledge base
+# =============================================================================
+# This is the BRAIN of the mod. The C# engine reads this file and matches each
+# milestone's `trigger` against the live ColonySnapshot. Adding ONI knowledge =
+# editing this file, not writing code.
+#
+# PHILOSOPHY (read before editing):
+#   * This is a HELPING TOOL, not a rulebook. Every line is "you might want to
+#     look at X", never "you must do X by cycle Y".
+#   * `soft_cycle` is a PRIOR for ordering and gentle nudges only. A careful
+#     small-population base that's "behind" the band is fine — never escalate
+#     urgency just because a cycle passed.
+#   * The real trigger is STATE (`trigger.state_hints`), not cycle. Cycle only
+#     breaks ties and softens the "you're a bit behind" phrasing.
+#   * PROGRESSION gates on STRUCTURE, not STOCK. A milestone about reaching the
+#     next tier (renewable oxygen, refined metal, steel, ...) stays visible until
+#     you've actually BUILT that next step. A big buffer of a FINITE resource does
+#     NOT hide the advice — it only LOWERS its urgency. Sitting on a huge algae
+#     pile is the best time to plan the electrolyzer, not a reason to go silent;
+#     the point is to answer "what now?" even when nothing is on fire. (Survival
+#     gaps are different: those gate on a genuine missing fundamental.)
+#   * Bias to PRECISION over coverage. A wrong nudge costs trust; a missing one
+#     costs nothing. If a trigger can't be detected reliably, leave the rule out
+#     until the StateReader can support it (set `status: draft`).
+#
+# SCHEMA (per milestone):
+#   id            stable key (used for dismiss + tests). dot.namespaced.
+#   category      Oxygen|Power|Food|Water|Sanitation|Heat|Morale|Research|
+#                 Industry|Exploration|Space|Dupes
+#   tier          survival | stabilization | infrastructure | endgame
+#   title         short imperative shown in the panel
+#   why           one-line reasoning shown under the title
+#   soft_cycle    [min, max] — typical cycle band this becomes relevant (SOFT)
+#   urgency_base  1..100 baseline; engine may scale it up by severity
+#                   90-100 crisis | 60-89 pressing | 30-59 progress | 1-29 polish
+#   trigger:
+#     when          human description of when to surface this
+#     state_hints   concrete things the StateReader must detect (verify these
+#                   are cheaply readable before promoting status: active)
+#   satisfied_when  when to STOP showing it (don't nag about solved problems)
+#   depends_on      [milestone ids] — don't surface until prerequisites are met
+#   dlc             any | base | spacedout   (relevance gating)
+#   status          active | draft   (draft = known-good advice, detection not
+#                   wired up yet; engine skips drafts)
+#   source          where the knowledge came from (for auditing/updating)
+#   notes           optional caveats
+#
+# SOURCES used to build this file (paraphrased, not copied):
+#   - ESC, "Surviving the first 150 cycles" (Steam guide) — cycle banding
+#   - Brothgar, "Surviving the Mid-Game" (Steam guide) — cycle 50-250 arc
+#   - Oxygen Not Included Wiki (oxygennotincluded.wiki.gg) — thresholds/mechanics
+#   - oni-db.com — building/resource data
+#   - Community forum consensus — timing priors (plastic/steel ~200, etc.)
+# =============================================================================
+
+meta:
+  game_version_note: "Built against current retail ONI. Re-audit thresholds after major updates."
+  disclaimer: "Advisory only. Every base differs; treat all timing as a rough direction, not a deadline."
+  urgency_bands:
+    crisis:   [90, 100]   # active death spiral
+    pressing: [60, 89]    # will become a crisis soon
+    progress: [30, 59]    # the 'what now?' sweet spot — most value lives here
+    polish:   [1, 29]     # quality-of-life, optimization
+  ordering_rule: "Sort by computed urgency desc; tie-break by tier (survival first), then soft_cycle min."
+
+milestones:
+
+  # ===========================================================================
+  # TIER 1 — SURVIVAL  (roughly cycles 1-30)
+  # The game mostly self-directs here; these are safety nets, not the point of
+  # the mod. Keep them high-precision so they only fire on a genuine gap.
+  # ===========================================================================
+
+  - id: oxygen.source
+    category: Oxygen
+    tier: survival
+    title: "Set up an oxygen source"
+    why: "No oxygen generation detected and breathable O2 is dropping — dupes will suffocate."
+    soft_cycle: [1, 12]
+    urgency_base: 96
+    trigger:
+      when: "no oxygen-generating building exists and ambient O2 is trending down"
+      state_hints:
+        - "count of Oxygen Diffuser / Electrolyzer / Rust Deoxidizer / Algae Terrarium == 0"
+        - "world Oxygen mass falling across recent snapshots"
+    satisfied_when: "at least one oxygen generator exists and O2 mass is stable or rising"
+    depends_on: []
+    dlc: any
+    status: active
+    source: "ESC 150-cycle guide; ONI wiki Getting Started"
+
+  - id: sanitation.toilet
+    category: Sanitation
+    tier: survival
+    title: "Build a toilet"
+    why: "Dupe bladders fill each cycle; without a toilet they make polluted water and get stressed."
+    soft_cycle: [1, 5]
+    urgency_base: 88
+    trigger:
+      when: "no Outhouse or Lavatory exists"
+      state_hints:
+        - "count of Outhouse + Lavatory == 0"
+    satisfied_when: "at least one toilet exists (ideally 1 per ~3-4 dupes)"
+    depends_on: []
+    dlc: any
+    status: active
+    source: "ONI wiki Getting Started"
+
+  - id: food.basic_farm
+    category: Food
+    tier: survival
+    title: "Start a food farm"
+    why: "Starting rations run out fast. A Mealwood farm is the cheapest reliable early calorie source."
+    soft_cycle: [3, 15]
+    urgency_base: 85
+    trigger:
+      when: "calorie buffer is shrinking and no cultivated food source exists"
+      state_hints:
+        - "count of Planter Box / Farm Tile with edible crop == 0"
+        - "calories-available trending down"
+    satisfied_when: "a farm covers daily calorie consumption with a positive buffer"
+    depends_on: []
+    dlc: any
+    status: active
+    source: "ESC 150-cycle guide; ONI wiki"
+    notes: "Mealwood needs dirt; the engine should later nudge toward water-based crops (see food.sustainable)."
+
+  - id: power.basic
+    category: Power
+    tier: survival
+    title: "Add power generation + a battery"
+    why: "Manual Generators alone won't keep up once you add machines. Research Power Regulation early."
+    soft_cycle: [5, 20]
+    urgency_base: 70
+    trigger:
+      when: "power consumed exceeds generated and battery charge is low"
+      state_hints:
+        - "circuit consumed_W > generated_W"
+        - "aggregate battery charge < 25%"
+    satisfied_when: "generation comfortably exceeds consumption with battery buffer"
+    depends_on: []
+    dlc: any
+    status: active
+    source: "ESC 150-cycle guide"
+
+  - id: research.early_stations
+    category: Research
+    tier: survival
+    title: "Get research running (both stations)"
+    why: "Most progression is gated behind tech. You need the Research Station and the Super Computer (advanced)."
+    soft_cycle: [2, 25]
+    urgency_base: 55
+    trigger:
+      when: "no advanced research station despite having power and materials"
+      state_hints:
+        - "count of Super Computer / advanced research building == 0"
+        - "power generation positive (so it's affordable)"
+    satisfied_when: "both research tiers built and an active research is selected"
+    depends_on: [power.basic]
+    dlc: any
+    status: active
+    source: "ONI wiki research tree"
+
+  - id: morale.basics
+    category: Morale
+    tier: survival
+    title: "Cover basic morale (beds, mess hall, decor)"
+    why: "Rising stress without an outlet leads to breakdowns. Cots, a proper mess hall, and some decor go a long way."
+    soft_cycle: [5, 30]
+    urgency_base: 60
+    trigger:
+      when: "average stress is elevated and basic morale buildings are missing"
+      state_hints:
+        - "avg dupe stress > 30%"
+        - "no Mess Hall room and/or beds < dupe count"
+    satisfied_when: "average stress low and dupes have beds + an eating area"
+    depends_on: []
+    dlc: any
+    status: active
+    source: "Brothgar mid-game guide; ONI wiki morale"
+
+  - id: sanitation.washing
+    category: Sanitation
+    tier: survival
+    title: "Add wash basins / sinks for germ control"
+    why: "Place washing at toilet exits and the kitchen entrance to stop food-poisoning germs spreading before an outbreak starts."
+    soft_cycle: [5, 25]
+    urgency_base: 45
+    trigger:
+      when: "toilets or a kitchen exist but no hand-washing on the path between them"
+      state_hints:
+        - "count of Wash Basin / Sink near toilet exits or food prep == 0"
+    satisfied_when: "washing stations gate the toilet->food path"
+    depends_on: [sanitation.toilet]
+    dlc: any
+    status: draft
+    source: "ONI wiki Getting Started"
+    notes: "Path-adjacency detection is non-trivial; keep draft until StateReader can approximate it."
+
+  # ===========================================================================
+  # TIER 2 — STABILIZATION  (roughly cycles 30-90)
+  # The first 'what now?' zone. Survival is handled; now it's about not hitting
+  # a wall when starting resources (algae, dirt, stored water) deplete.
+  # ===========================================================================
+
+  - id: power.coal
+    category: Power
+    tier: stabilization
+    title: "Move to Coal Generators"
+    why: "Manual Generators don't scale with a growing base. Coal Generators (plus batteries) carry you through mid-game."
+    soft_cycle: [15, 50]
+    urgency_base: 50
+    trigger:
+      when: "still relying on manual generators while consumption grows"
+      state_hints:
+        - "Manual Generator is the main power source AND consumed_W is climbing"
+        - "no Coal/Hydrogen/Natural Gas generator present"
+    satisfied_when: "an automated generator covers base load"
+    depends_on: [power.basic]
+    dlc: any
+    status: active
+    source: "ESC 150-cycle guide"
+
+  - id: oxygen.electrolyzer
+    category: Oxygen
+    tier: stabilization
+    title: "Transition to electrolyzer oxygen (SPOM)"
+    why: "Algae is finite. Build a water-fed electrolyzer setup before algae runs out, or you'll face an oxygen crisis with no fallback."
+    soft_cycle: [25, 70]
+    urgency_base: 65
+    trigger:
+      when: "oxygen still comes from algae diffusers and no electrolyzer has been built yet — show this REGARDLESS of current algae stock; the stock only sets urgency"
+      state_hints:
+        - "Oxygen Diffuser (prefab MineralDeoxidizer) present"
+        - "count of Electrolyzer == 0"
+        - "accessible Algae stock — used only to SCALE urgency, never to gate visibility"
+    satisfied_when: "an electrolyzer exists (the next step has been built)"
+    depends_on: [oxygen.source, power.coal]
+    dlc: any
+    status: active
+    source: "ESC 150-cycle guide; ONI wiki oxygen"
+    notes: "PROGRESSION rule: persists until an electrolyzer exists; a big algae buffer does NOT hide it. Urgency ramps ~38 (plenty of algae, plan ahead) -> ~89 (algae nearly gone). See PHILOSOPHY: structure gates, stock scales."
+
+  - id: water.sieve
+    category: Water
+    tier: stabilization
+    title: "Recycle polluted water with a Water Sieve"
+    why: "Toilets and many processes produce polluted water. A sieve turns it back into usable water and slows your water decline."
+    soft_cycle: [20, 60]
+    urgency_base: 48
+    trigger:
+      when: "polluted water is accumulating and net water is trending down with no sieve"
+      state_hints:
+        - "world PollutedWater stock rising"
+        - "world Water stock trending down"
+        - "count of Water Sieve == 0"
+    satisfied_when: "a sieve loop is recycling polluted water"
+    depends_on: []
+    dlc: any
+    status: active
+    source: "ESC 150-cycle guide"
+
+  - id: waste.co2
+    category: Sanitation
+    tier: stabilization
+    title: "Deal with CO2 buildup"
+    why: "CO2 sinks into your base and pools around dupes. Pump it to a pit, skim it with a Carbon Skimmer, or use deodorizers for polluted oxygen."
+    soft_cycle: [20, 70]
+    urgency_base: 42
+    trigger:
+      when: "CO2 is pooling in living areas with no management"
+      state_hints:
+        - "CO2 mass high in base region"
+        - "no Carbon Skimmer and no dedicated CO2 pump/pit"
+    satisfied_when: "CO2 is being removed or contained away from dupes"
+    depends_on: []
+    dlc: any
+    status: draft
+    source: "ESC 150-cycle guide"
+    notes: "Localized-gas detection needs region sampling; keep draft until that's available."
+
+  - id: food.sustainable
+    category: Food
+    tier: stabilization
+    title: "Move to a sustainable food crop"
+    why: "Mealwood eats dirt, which is finite. Transition toward water-based crops like Bristle Blossom for more calories and longevity."
+    soft_cycle: [40, 100]
+    urgency_base: 40
+    trigger:
+      when: "food still depends on dirt-hungry crops and dirt reserves are dropping"
+      state_hints:
+        - "Mealwood is the main food source"
+        - "world Dirt stock trending down"
+    satisfied_when: "a water-based or ranched food source covers consumption"
+    depends_on: [food.basic_farm]
+    dlc: any
+    status: active
+    source: "ESC 150-cycle guide; ONI wiki food"
+
+  - id: heat.awareness
+    category: Heat
+    tier: stabilization
+    title: "Start managing heat"
+    why: "Heat only accumulates. Insulate the base, keep hot machines out of living areas, and plan cooling before plants start dying."
+    soft_cycle: [40, 100]
+    urgency_base: 50
+    trigger:
+      when: "base ambient temperature is climbing toward crop/dupe discomfort with no cooling"
+      state_hints:
+        - "representative base temperature rising past ~30-35 C"
+        - "no active cooling (no Thermo Regulator / AquaTuner / wheezewort use)"
+    satisfied_when: "base temperature is stable within a comfortable range"
+    depends_on: []
+    dlc: any
+    status: active
+    source: "ESC 150-cycle guide; ONI wiki temperature"
+    notes: "Sample a few representative tiles/buildings, not the whole map (perf)."
+
+  - id: exploration.biomes
+    category: Exploration
+    tier: stabilization
+    title: "Explore out to the surrounding biomes"
+    why: "Plastic, cooling, and sustainable power all depend on what's outside — oil, ice, cold biomes, and geysers. Scout earlier rather than later."
+    soft_cycle: [30, 90]
+    urgency_base: 47
+    trigger:
+      when: "base is stable but surrounding biomes are still largely unexplored"
+      state_hints:
+        - "explored area still close to the starting biome"
+        - "no geysers/vents discovered/claimed yet"
+    satisfied_when: "key biomes scouted and at least one renewable source (geyser/vent) located"
+    depends_on: []
+    dlc: any
+    status: draft
+    source: "ESC guide comments (community: explore earlier); Brothgar mid-game guide"
+    notes: "Community strongly favors EARLY exploration vs the 150-guide's later timing. Detection of 'explored extent' is fuzzy — keep draft."
+
+  - id: suits.atmo
+    category: Industry
+    tier: stabilization
+    title: "Set up Atmo Suits for hazardous areas"
+    why: "Atmo suits let dupes work safely in hot, polluted, or vacuum biomes. Build a suit dock + checkpoint before sending them into danger."
+    soft_cycle: [50, 120]
+    urgency_base: 45
+    trigger:
+      when: "refined metal + research available and dupes are entering hazardous biomes unprotected"
+      state_hints:
+        - "count of Atmo Suit Dock == 0"
+        - "hazardous biome adjacent and being dug into"
+    satisfied_when: "a suit dock + checkpoint gates the hazardous area"
+    depends_on: [industry.refined_metal]
+    dlc: any
+    status: draft
+    source: "Brothgar mid-game guide; ONI wiki"
+
+  - id: dupes.skills
+    category: Dupes
+    tier: stabilization
+    title: "Assign skills and manage the morale ceiling"
+    why: "Skills boost output but raise a dupe's morale requirement. Keep required morale under available morale or stress creeps up."
+    soft_cycle: [30, 120]
+    urgency_base: 38
+    trigger:
+      when: "several dupes have required-morale above their available morale"
+      state_hints:
+        - "for N dupes: required morale > current morale"
+    satisfied_when: "morale requirements are met across the colony"
+    depends_on: [morale.basics]
+    dlc: any
+    status: active
+    source: "ONI wiki morale/skills"
+
+  # ===========================================================================
+  # TIER 3 — INFRASTRUCTURE  (roughly cycles 90-250)
+  # The heart of the 'what now?' problem. Survival is trivial; the player has a
+  # stable base and no idea what to build next. Spend the most rule effort here.
+  # ===========================================================================
+
+  - id: industry.refined_metal
+    category: Industry
+    tier: infrastructure
+    title: "Build a Metal Refinery for refined metals"
+    why: "Refined metals (and the heat-handling that comes with refining) unlock steel, advanced power, cooling, and rocketry. A core mid-game pivot."
+    soft_cycle: [60, 180]
+    urgency_base: 52
+    trigger:
+      when: "no refined metal production despite having ore and power"
+      state_hints:
+        - "count of Metal Refinery == 0"
+        - "raw metal ore available"
+    satisfied_when: "refined metal is being produced (with its heat handled)"
+    depends_on: [power.coal]
+    dlc: any
+    status: active
+    source: "Brothgar mid-game guide; ONI wiki"
+
+  - id: cooling.aquatuner
+    category: Heat
+    tier: infrastructure
+    title: "Build an AquaTuner + Steam Turbine cooling loop"
+    why: "The workhorse of ONI cooling. An AquaTuner cooled by a Steam Turbine gives you scalable, self-powering temperature control."
+    soft_cycle: [100, 250]
+    urgency_base: 55
+    trigger:
+      when: "a real heat problem exists and you have the materials (steel/plastic) but no aquatuner loop"
+      state_hints:
+        - "base or key process running too hot"
+        - "refined metal / plastic available"
+        - "count of AquaTuner == 0"
+    satisfied_when: "an aquatuner-based cooling loop is operating"
+    depends_on: [industry.refined_metal, heat.awareness]
+    dlc: any
+    status: active
+    source: "Brothgar mid-game guide; ONI wiki temperature"
+    notes: "Often needs steel and plastic first; community puts this around cycle 200."
+
+  - id: industry.steel
+    category: Industry
+    tier: infrastructure
+    title: "Produce Steel"
+    why: "Steel resists heat and is required for turbines, robo-miners, and most space/cooling builds. Needs refined metal, coal, and lime (egg shells)."
+    soft_cycle: [100, 250]
+    urgency_base: 48
+    trigger:
+      when: "steel-dependent builds are wanted but no steel production exists"
+      state_hints:
+        - "count of refined metal production > 0"
+        - "world Steel stock ~0 and Lime source available/needed"
+    satisfied_when: "steel is being produced"
+    depends_on: [industry.refined_metal]
+    dlc: any
+    status: active
+    source: "Community timing (~cycle 200); ONI wiki steel"
+
+  - id: industry.plastic
+    category: Industry
+    tier: infrastructure
+    title: "Set up Plastic production"
+    why: "Plastic is needed for aquatuners, advanced buildings, and rockets. Get it from a Drecko ranch or by refining oil at a Polymer Press."
+    soft_cycle: [100, 250]
+    urgency_base: 46
+    trigger:
+      when: "plastic-dependent builds are wanted but no plastic source exists"
+      state_hints:
+        - "world Plastic stock ~0"
+        - "no Drecko ranch and no Polymer Press"
+    satisfied_when: "a renewable plastic source is running"
+    depends_on: [exploration.biomes]
+    dlc: any
+    status: active
+    source: "Community timing (~cycle 200); ONI wiki plastic"
+
+  - id: power.petroleum
+    category: Power
+    tier: infrastructure
+    title: "Move toward Petroleum / Natural Gas power"
+    why: "Coal is finite without ranching. Refining oil into petroleum (or tapping natural gas) gives denser, longer-lasting power."
+    soft_cycle: [120, 280]
+    urgency_base: 44
+    trigger:
+      when: "still coal-dependent at higher cycles with oil/gas accessible and no upgrade"
+      state_hints:
+        - "main power is coal and coal reserves finite (no hatch ranch)"
+        - "oil biome or natural gas geyser discovered"
+        - "no Petroleum/Natural Gas generator"
+    satisfied_when: "a denser fuel power source is online"
+    depends_on: [exploration.biomes, power.coal]
+    dlc: any
+    status: active
+    source: "Brothgar mid-game guide; ONI wiki power"
+
+  - id: ranching.coal
+    category: Food
+    tier: infrastructure
+    title: "Start a Hatch ranch for sustainable coal/metal"
+    why: "Hatches turn rock/ore into coal and meat indefinitely. A ranch removes the 'coal runs out' clock and adds a renewable food stream."
+    soft_cycle: [80, 220]
+    urgency_base: 40
+    trigger:
+      when: "coal is being burned with no ranch backing it up"
+      state_hints:
+        - "Coal Generator in use"
+        - "no Hatch ranch (Stable room with hatches)"
+    satisfied_when: "a ranch sustains coal/metal/meat output"
+    depends_on: []
+    dlc: any
+    status: draft
+    source: "Brothgar mid-game guide; ONI wiki ranching"
+    notes: "Ranch/room detection (Stable + critter type) needs room-query support."
+
+  - id: water.geyser_tamed
+    category: Water
+    tier: infrastructure
+    title: "Tame a water geyser or vent"
+    why: "Stored water is finite. Capturing and cooling a Water/Polluted Water/Steam geyser makes your water supply genuinely renewable."
+    soft_cycle: [100, 280]
+    urgency_base: 50
+    trigger:
+      when: "net water still negative long-term and a geyser is found but not tapped"
+      state_hints:
+        - "long-run water balance negative"
+        - "a water-yielding geyser/vent discovered but not plumbed"
+    satisfied_when: "a geyser/vent feeds the water supply renewably"
+    depends_on: [exploration.biomes]
+    dlc: any
+    status: draft
+    source: "Brothgar mid-game guide; oni-db geyser data"
+
+  - id: base.industrial_brick
+    category: Heat
+    tier: infrastructure
+    title: "Isolate hot industrial machines"
+    why: "Refineries, generators, and aquatuners dump huge heat. Move them into an insulated 'industrial brick' so they don't cook your living base."
+    soft_cycle: [120, 280]
+    urgency_base: 35
+    trigger:
+      when: "high-heat machines sit inside the livable base"
+      state_hints:
+        - "heat-heavy buildings co-located with beds/farms"
+        - "base temperature rising near those machines"
+    satisfied_when: "industrial heat sources are insulated/separated"
+    depends_on: [industry.refined_metal]
+    dlc: any
+    status: draft
+    source: "Brothgar mid-game guide; ONI wiki"
+
+  # ===========================================================================
+  # TIER 4 — ENDGAME  (roughly cycles 250+)
+  # Closing the loops and reaching for space. These are 'progress/polish', never
+  # urgent — a base can run forever without them.
+  # ===========================================================================
+
+  - id: power.sustainable_loop
+    category: Power
+    tier: endgame
+    title: "Close your power loop"
+    why: "Aim for power that needs no hauled fuel: natural gas, petroleum from a renewable oil source, or steam turbines on industrial heat."
+    soft_cycle: [250, 600]
+    urgency_base: 34
+    trigger:
+      when: "power still depends on a depleting fuel stockpile at high cycle"
+      state_hints:
+        - "main power source consumes a finite, non-renewable stockpile"
+    satisfied_when: "power is fed by a renewable source"
+    depends_on: [power.petroleum]
+    dlc: any
+    status: draft
+    source: "Brothgar mid-game guide"
+
+  - id: space.access
+    category: Space
+    tier: endgame
+    title: "Open up space access"
+    why: "Telescope + rocketry research (and a surface launch area) unlock resource-gathering missions and, in Spaced Out, other asteroids."
+    soft_cycle: [200, 500]
+    urgency_base: 40
+    trigger:
+      when: "industry is stable (steel + plastic) but no space progress started"
+      state_hints:
+        - "steel and plastic production exist"
+        - "no telescope / no rocket platform / rocketry research incomplete"
+    satisfied_when: "space research started and a launch site is being built"
+    depends_on: [industry.steel, industry.plastic]
+    dlc: any
+    status: active
+    source: "ESC guide (deep space missions); ONI wiki rocketry"
+    notes: "Base game = telescope/scanners/surface; Spaced Out = rocket platform to other asteroids. Phrase generically or branch on dlc."
+
+  - id: space.rockets
+    category: Space
+    tier: endgame
+    title: "Build and launch a rocket"
+    why: "Rockets gather rare resources and (in Spaced Out) reach new asteroids for materials your home rock lacks."
+    soft_cycle: [250, 600]
+    urgency_base: 36
+    trigger:
+      when: "space access exists but no rocket has been built/launched"
+      state_hints:
+        - "launch infrastructure present"
+        - "no completed rocket"
+    satisfied_when: "a rocket has launched successfully"
+    depends_on: [space.access]
+    dlc: any
+    status: draft
+    source: "ONI wiki rocketry"
+
+  - id: food.fully_renewable
+    category: Food
+    tier: endgame
+    title: "Close the food loop"
+    why: "Late game, move to fully renewable food — ranched meat/eggs or geyser-watered crops — so calories never depend on a finite input."
+    soft_cycle: [250, 600]
+    urgency_base: 30
+    trigger:
+      when: "food still draws on a finite input (dirt/stored water) at high cycle"
+      state_hints:
+        - "food chain consumes a non-renewable input"
+    satisfied_when: "food is fully renewable"
+    depends_on: [food.sustainable]
+    dlc: any
+    status: draft
+    source: "Brothgar mid-game guide; ONI wiki food"
+
+  - id: oxygen.fully_renewable
+    category: Oxygen
+    tier: endgame
+    title: "Make oxygen fully renewable"
+    why: "Feed your electrolyzers from a tamed water geyser so oxygen runs indefinitely without draining stored water."
+    soft_cycle: [250, 600]
+    urgency_base: 30
+    trigger:
+      when: "electrolyzers run on finite stored water rather than a renewable source"
+      state_hints:
+        - "electrolyzer water input is from a depleting reservoir"
+    satisfied_when: "oxygen water supply is geyser-fed / renewable"
+    depends_on: [oxygen.electrolyzer, water.geyser_tamed]
+    dlc: any
+    status: draft
+    source: "ONI wiki oxygen; community closed-loop builds"
+
+  - id: dupes.specialization
+    category: Dupes
+    tier: endgame
+    title: "Specialize dupes and equip exosuits"
+    why: "Late game, lean into specialists (high-skill roles), good attributes, and exosuits/jet suits for efficiency and reach."
+    soft_cycle: [200, 600]
+    urgency_base: 25
+    trigger:
+      when: "dupes are still generalists with low specialization at high cycle"
+      state_hints:
+        - "few assigned high-tier skills relative to colony maturity"
+    satisfied_when: "key roles are filled by trained specialists"
+    depends_on: [dupes.skills]
+    dlc: any
+    status: draft
+    source: "ONI wiki skills"
+
+  - id: power.radiation_nuclear
+    category: Power
+    tier: endgame
+    title: "(Optional) Explore nuclear / radiation power"
+    why: "A Spaced Out late-game option — research reactors and radbolt systems for dense power, if you want a project beyond the basics."
+    soft_cycle: [300, 700]
+    urgency_base: 20
+    trigger:
+      when: "everything stable, player wants an advanced power project, nuclear unexplored"
+      state_hints:
+        - "uranium/radiation infrastructure absent"
+    satisfied_when: "nuclear/radbolt systems are in use (or player dismisses)"
+    depends_on: [power.sustainable_loop]
+    dlc: spacedout
+    status: draft
+    source: "ONI wiki radiation; mid-game guide (radbolt section)"
+    notes: "DLC-only. Low urgency — purely optional direction."
