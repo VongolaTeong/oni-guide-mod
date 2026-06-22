@@ -37,11 +37,23 @@ namespace NextStepGuide.State
         public Dictionary<string, float> ResourceKg = new Dictionary<string, float>(StringComparer.Ordinal);
         public bool ResourcesKnown;
 
-        // ---- Power (reserved for later phases; default unknown) -------------
+        // ---- Power ----------------------------------------------------------
+        // Totals summed across all circuits; battery fraction is the LOWEST among
+        // circuits that actually have batteries (the most-drained one).
         public float PowerGeneratedW;
         public float PowerConsumedW;
-        public float BatteryChargeFraction; // 0..1
+        public float BatteryChargeFraction; // 0..1 (1 when no batteries exist)
+        public bool PowerHasBattery;        // any circuit has a battery
         public bool PowerKnown;
+
+        // ---- Morale (average duplicant stress, 0..100 %) --------------------
+        public float AvgStress;
+        public bool StressKnown;
+
+        // ---- Heat (temperature where dupes actually are, Kelvin) ------------
+        public float AvgBaseTempK;
+        public float MaxBaseTempK;
+        public bool HeatKnown;
 
         // =====================================================================
         // Convenience accessors used by rules (null-safe, allocation-free).

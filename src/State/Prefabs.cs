@@ -55,6 +55,21 @@ namespace NextStepGuide.State
         public const string MetalRefinery = "MetalRefinery";
         public const string PolymerPress = "Polymerizer";              // "Polymer Press"
 
+        // Atmo suits
+        public const string AtmoSuitDock = "SuitLocker";               // "Atmo Suit Dock"
+        public const string SuitCheckpoint = "SuitMarker";             // "Exosuit Checkpoint"
+        public const string SuitFabricator = "SuitFabricator";         // "Exosuit Forge"
+
+        // Ranching
+        public const string GroomingStation = "RanchStation";          // "Grooming Station"
+        public const string CritterFeeder = "CreatureFeeder";          // "Critter Feeder"
+        public const string EggIncubator = "EggIncubator";
+
+        // Cooling
+        // GOTCHA: the AquaTuner's prefab id is "LiquidConditioner" (and the gas
+        // "Thermo Regulator" is "AirConditioner"). Verified U59-737790.
+        public const string AquaTuner = "LiquidConditioner";
+
         // ---- Convenience groupings used by rules ----
         public static readonly string[] OxygenSources =
             { OxygenDiffuser, Electrolyzer, RustDeoxidizer, AlgaeTerrarium };
@@ -77,5 +92,17 @@ namespace NextStepGuide.State
         public static readonly string[] AutomatedGenerators =
             { CoalGenerator, WoodGasGenerator, HydrogenGenerator, NaturalGasGenerator,
               PetroleumGenerator, SteamTurbine, SolarPanel };
+
+        /// <summary>Denser, longer-lasting fuel power than coal (mid/late game).</summary>
+        public static readonly string[] DenserGenerators =
+            { NaturalGasGenerator, PetroleumGenerator, HydrogenGenerator };
+
+        /// <summary>Any part of an atmo-suit setup (dock / checkpoint / forge).</summary>
+        public static readonly string[] AtmoSuitStations =
+            { AtmoSuitDock, SuitCheckpoint, SuitFabricator };
+
+        /// <summary>Buildings that indicate an active critter ranch.</summary>
+        public static readonly string[] RanchBuildings =
+            { GroomingStation, CritterFeeder, EggIncubator };
     }
 }

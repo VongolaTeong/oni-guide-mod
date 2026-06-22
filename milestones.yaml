@@ -389,8 +389,9 @@ milestones:
     satisfied_when: "a suit dock + checkpoint gates the hazardous area"
     depends_on: [industry.refined_metal]
     dlc: any
-    status: draft
+    status: active
     source: "Brothgar mid-game guide; ONI wiki"
+    notes: "Detected structurally: refined metal available (Metal Refinery) but no Atmo Suit Dock/Checkpoint/Forge yet. The 'entering a hazard biome' nuance lives in the why text."
 
   - id: dupes.skills
     category: Dupes
@@ -447,7 +448,10 @@ milestones:
         - "refined metal / plastic available"
         - "count of AquaTuner == 0"
     satisfied_when: "an aquatuner-based cooling loop is operating"
-    depends_on: [industry.refined_metal, heat.awareness]
+    # NOTE: deliberately NOT depends_on heat.awareness — that rule stays unsatisfied
+    # while the base is hot, which is exactly when this should surface. Category
+    # collapse already sequences the two Heat tips by urgency.
+    depends_on: [industry.refined_metal]
     dlc: any
     status: active
     source: "Brothgar mid-game guide; ONI wiki temperature"
@@ -523,9 +527,9 @@ milestones:
     satisfied_when: "a ranch sustains coal/metal/meat output"
     depends_on: []
     dlc: any
-    status: draft
+    status: active
     source: "Brothgar mid-game guide; ONI wiki ranching"
-    notes: "Ranch/room detection (Stable + critter type) needs room-query support."
+    notes: "Detected via a ranch building proxy (Grooming Station / Critter Feeder / Egg Incubator): you're burning coal but have no ranch backing it up. Not full room/critter-type detection."
 
   - id: water.geyser_tamed
     category: Water

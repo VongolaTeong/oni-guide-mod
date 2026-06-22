@@ -17,6 +17,8 @@ namespace NextStepGuide.Rules
             new ToiletRule(),
             new BasicFarmRule(),
             new ResearchStationsRule(),
+            new PowerBrownoutRule(),
+            new MoraleBasicsRule(),
 
             // Stabilization
             new ElectrolyzerTransitionRule(),
@@ -24,9 +26,16 @@ namespace NextStepGuide.Rules
             new CookFoodRule(),
             new WaterSieveRule(),
             new LavatoryUpgradeRule(),
+            new HeatAwarenessRule(),
+            new AtmoSuitsRule(),
 
             // Infrastructure
             new MetalRefineryRule(),
+            new SteelRule(),
+            new PlasticRule(),
+            new RanchingRule(),
+            new PetroleumPowerRule(),
+            new AquaTunerRule(),
         };
     }
 }

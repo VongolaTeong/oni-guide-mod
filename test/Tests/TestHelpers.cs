@@ -30,6 +30,32 @@ namespace NextStepGuide.Tests
             s.ResourceKg[tag] = kg;
             return s;
         }
+
+        public static ColonySnapshot WithPower(this ColonySnapshot s,
+            float generatedW, float consumedW, float batteryFraction = 1f, bool hasBattery = true)
+        {
+            s.PowerGeneratedW = generatedW;
+            s.PowerConsumedW = consumedW;
+            s.PowerHasBattery = hasBattery;
+            s.BatteryChargeFraction = hasBattery ? batteryFraction : 1f;
+            s.PowerKnown = true;
+            return s;
+        }
+
+        public static ColonySnapshot WithStress(this ColonySnapshot s, float avgPct)
+        {
+            s.AvgStress = avgPct;
+            s.StressKnown = true;
+            return s;
+        }
+
+        public static ColonySnapshot WithHeat(this ColonySnapshot s, float avgK, float maxK = -1f)
+        {
+            s.AvgBaseTempK = avgK;
+            s.MaxBaseTempK = maxK < 0f ? avgK : maxK;
+            s.HeatKnown = true;
+            return s;
+        }
     }
 
     /// <summary>Loads the real milestones.yaml once for the whole test run.</summary>

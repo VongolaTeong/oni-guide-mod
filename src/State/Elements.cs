@@ -12,8 +12,10 @@ namespace NextStepGuide.State
         public const string DirtyWater = "DirtyWater"; // "Polluted Water"
         public const string Dirt = "Dirt";
         public const string Oxygen = "Oxygen";
+        public const string Steel = "Steel";
+        public const string Plastic = "Plastic";
 
         /// <summary>Tags the StateReader probes each snapshot (kept small for perf).</summary>
-        public static readonly string[] Tracked = { Algae, Water, DirtyWater, Dirt };
+        public static readonly string[] Tracked = { Algae, Water, DirtyWater, Dirt, Steel, Plastic };
     }
 }

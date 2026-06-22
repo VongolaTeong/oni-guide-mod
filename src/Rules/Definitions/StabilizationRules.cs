@@ -145,4 +145,52 @@ namespace NextStepGuide.Rules.Definitions
         public override bool IsSatisfied(ColonySnapshot s)
             => s.HasAnyBuilding(Prefabs.FlushToilet);
     }
+
+    /// <summary>
+    /// heat.awareness — the temperature where dupes live is climbing past comfort
+    /// (~30 C) and rising. Heat only accumulates, so this is a genuine creeping
+    /// problem: it gates on the measured base temperature (not structure) and
+    /// ramps urgency as it gets hotter. If the base cools back down (insulation,
+    /// cooling, wheezeworts) the tip clears on its own.
+    /// </summary>
+    public sealed class HeatAwarenessRule : RuleBase
+    {
+        public const float WarmAboveK = 303.15f;  // 30 C — start paying attention
+        public const float HotK = 318.15f;        // 45 C — clearly a problem
+
+        public override string Id => "heat.awareness";
+
+        public override bool IsRelevant(ColonySnapshot s)
+            => s.HeatKnown && s.DuplicantsKnown && s.LiveDuplicants > 0;
+
+        public override bool IsSatisfied(ColonySnapshot s)
+            => s.AvgBaseTempK < WarmAboveK;
+
+        public override int Urgency(ColonySnapshot s, MilestoneDef def)
+        {
+            int b = def?.UrgencyBase ?? 50;
+            float t = (s.AvgBaseTempK - WarmAboveK) / (HotK - WarmAboveK);
+            return Scale(t, b, 88);
+        }
+    }
+
+    /// <summary>
+    /// suits.atmo — refined metal is available (a Metal Refinery exists) but there's
+    /// no atmo-suit setup yet. Suits let dupes work safely in hot/polluted/vacuum
+    /// biomes, which is the gateway to the whole mid-game (oil, cool steam vents,
+    /// gas geysers). Structure-gated on the refinery; the "before you dig into a
+    /// hazard biome" nuance is in the why text since biome-adjacency isn't read.
+    /// </summary>
+    public sealed class AtmoSuitsRule : RuleBase
+    {
+        public override string Id => "suits.atmo";
+
+        public override bool IsRelevant(ColonySnapshot s)
+            => s.DuplicantsKnown && s.LiveDuplicants > 0 && s.BuildingsKnown
+               && s.HasAnyBuilding(Prefabs.MetalRefinery)
+               && !s.HasAnyBuilding(Prefabs.AtmoSuitStations);
+
+        public override bool IsSatisfied(ColonySnapshot s)
+            => s.HasAnyBuilding(Prefabs.AtmoSuitStations);
+    }
 }

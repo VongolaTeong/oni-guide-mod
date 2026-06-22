@@ -271,5 +271,195 @@ namespace NextStepGuide.Tests
 
             Assert.True(r.IsSatisfied(Snap.Fresh().With(Prefabs.Outhouse).With(Prefabs.FlushToilet)));
         }
+
+        // ---- power.basic (brownout / no battery) ---------------------------
+
+        [Fact]
+        public void PowerBasic_Irrelevant_WhenPowerUnknown()
+        {
+            // Fail-soft: if the circuit probe didn't run, don't guess.
+            var r = new PowerBrownoutRule();
+            Assert.False(r.IsRelevant(Snap.Fresh())); // PowerKnown defaults false
+        }
+
+        [Fact]
+        public void PowerBasic_Fires_WithNoBattery_OrDrainedBattery()
+        {
+            var r = new PowerBrownoutRule();
+
+            var noBattery = Snap.Fresh().WithPower(generatedW: 400, consumedW: 600, hasBattery: false);
+            Assert.True(r.IsRelevant(noBattery));
+            Assert.False(r.IsSatisfied(noBattery));
+
+            var drained = Snap.Fresh().WithPower(400, 600, batteryFraction: 0.05f);
+            Assert.False(r.IsSatisfied(drained));
+
+            var healthy = Snap.Fresh().WithPower(800, 600, batteryFraction: 0.9f);
+            Assert.True(r.IsSatisfied(healthy)); // comfortable buffer -> solved
+        }
+
+        [Fact]
+        public void PowerBasic_Urgency_RampsAsBatteryDrains()
+        {
+            var r = new PowerBrownoutRule();
+            var def = Kb.Library.Get(r.Id);
+
+            int low = r.Urgency(Snap.Fresh().WithPower(400, 600, batteryFraction: 0.02f), def);
+            int near = r.Urgency(Snap.Fresh().WithPower(400, 600, batteryFraction: 0.18f), def);
+            Assert.True(low > near, $"emptier battery should be more urgent ({low} vs {near})");
+            Assert.True(near >= def.UrgencyBase);
+        }
+
+        // ---- morale.basics (stress) ----------------------------------------
+
+        [Fact]
+        public void Morale_Fires_OnHighStress_ClearsWhenLow()
+        {
+            var r = new MoraleBasicsRule();
+
+            var stressed = Snap.Fresh().WithStress(55f);
+            Assert.True(r.IsRelevant(stressed));
+            Assert.False(r.IsSatisfied(stressed));
+
+            Assert.True(r.IsSatisfied(Snap.Fresh().WithStress(12f)));
+            Assert.False(r.IsRelevant(Snap.Fresh())); // StressKnown false -> quiet
+        }
+
+        // ---- heat.awareness ------------------------------------------------
+
+        [Fact]
+        public void Heat_Fires_WhenBaseWarm_ClearsWhenCool()
+        {
+            var r = new HeatAwarenessRule();
+
+            var warm = Snap.Fresh().WithHeat(310f); // ~37 C
+            Assert.True(r.IsRelevant(warm));
+            Assert.False(r.IsSatisfied(warm));
+
+            Assert.True(r.IsSatisfied(Snap.Fresh().WithHeat(298f))); // ~25 C -> fine
+            Assert.False(r.IsRelevant(Snap.Fresh()));                // HeatKnown false -> quiet
+        }
+
+        [Fact]
+        public void Heat_Urgency_RampsWithTemperature()
+        {
+            var r = new HeatAwarenessRule();
+            var def = Kb.Library.Get(r.Id);
+            int mild = r.Urgency(Snap.Fresh().WithHeat(305f), def);
+            int hot = r.Urgency(Snap.Fresh().WithHeat(316f), def);
+            Assert.True(hot > mild, $"hotter base should be more urgent ({hot} vs {mild})");
+        }
+
+        // ---- industry.steel / industry.plastic -----------------------------
+
+        [Fact]
+        public void Steel_Fires_WithRefineryAndNoSteel_ThenSatisfied()
+        {
+            var r = new SteelRule();
+
+            var refineryNoSteel = Snap.Fresh().With(Prefabs.MetalRefinery);
+            Assert.True(r.IsRelevant(refineryNoSteel));
+            Assert.False(r.IsSatisfied(refineryNoSteel));
+
+            // No refinery -> not relevant (won't nag a pre-industrial base).
+            Assert.False(r.IsRelevant(Snap.Fresh()));
+
+            Assert.True(r.IsSatisfied(Snap.Fresh().With(Prefabs.MetalRefinery)
+                                                  .WithResource(Elements.Steel, 500)));
+        }
+
+        [Fact]
+        public void Plastic_Fires_WhenIndustrial_SatisfiedByPressOrStock()
+        {
+            var r = new PlasticRule();
+
+            var needsPlastic = Snap.Fresh().With(Prefabs.MetalRefinery);
+            Assert.True(r.IsRelevant(needsPlastic));
+            Assert.False(r.IsSatisfied(needsPlastic));
+
+            // Pre-industrial base (no refinery) -> not relevant.
+            Assert.False(r.IsRelevant(Snap.Fresh()));
+
+            // A Polymer Press OR a plastic stockpile (e.g. a Drecko rancher) solves it.
+            Assert.True(r.IsSatisfied(Snap.Fresh().With(Prefabs.MetalRefinery).With(Prefabs.PolymerPress)));
+            Assert.True(r.IsSatisfied(Snap.Fresh().With(Prefabs.MetalRefinery)
+                                                  .WithResource(Elements.Plastic, 300)));
+        }
+
+        // ---- suits.atmo (guide-derived) ------------------------------------
+
+        [Fact]
+        public void AtmoSuits_Fires_WithRefineryAndNoSuits_ThenSatisfied()
+        {
+            var r = new AtmoSuitsRule();
+
+            var refineryNoSuits = Snap.Fresh().With(Prefabs.MetalRefinery);
+            Assert.True(r.IsRelevant(refineryNoSuits));
+            Assert.False(r.IsSatisfied(refineryNoSuits));
+
+            // Pre-industrial base -> not relevant.
+            Assert.False(r.IsRelevant(Snap.Fresh()));
+
+            Assert.True(r.IsSatisfied(Snap.Fresh().With(Prefabs.MetalRefinery).With(Prefabs.AtmoSuitDock)));
+            Assert.True(r.IsSatisfied(Snap.Fresh().With(Prefabs.MetalRefinery).With(Prefabs.SuitFabricator)));
+        }
+
+        // ---- ranching.coal (guide-derived) ---------------------------------
+
+        [Fact]
+        public void Ranching_Fires_OnCoalWithoutRanch_ThenSatisfied()
+        {
+            var r = new RanchingRule();
+
+            var coalNoRanch = Snap.Fresh().With(Prefabs.CoalGenerator);
+            Assert.True(r.IsRelevant(coalNoRanch));
+            Assert.False(r.IsSatisfied(coalNoRanch));
+
+            // No coal burning -> nothing to make renewable.
+            Assert.False(r.IsRelevant(Snap.Fresh()));
+
+            Assert.True(r.IsSatisfied(Snap.Fresh().With(Prefabs.CoalGenerator).With(Prefabs.GroomingStation)));
+            Assert.True(r.IsSatisfied(Snap.Fresh().With(Prefabs.CoalGenerator).With(Prefabs.CritterFeeder)));
+        }
+
+        // ---- power.petroleum (guide-derived) -------------------------------
+
+        [Fact]
+        public void Petroleum_Fires_OnIndustrialCoalOnly_ThenSatisfied()
+        {
+            var r = new PetroleumPowerRule();
+
+            var coalOnly = Snap.Fresh().With(Prefabs.MetalRefinery).With(Prefabs.CoalGenerator);
+            Assert.True(r.IsRelevant(coalOnly));
+            Assert.False(r.IsSatisfied(coalOnly));
+
+            // No refinery yet -> too early.
+            Assert.False(r.IsRelevant(Snap.Fresh().With(Prefabs.CoalGenerator)));
+
+            Assert.True(r.IsSatisfied(Snap.Fresh().With(Prefabs.MetalRefinery)
+                                                  .With(Prefabs.CoalGenerator).With(Prefabs.PetroleumGenerator)));
+        }
+
+        // ---- cooling.aquatuner (guide-derived, heat-probe) -----------------
+
+        [Fact]
+        public void AquaTuner_Fires_WhenHotWithMaterials_ThenSatisfied()
+        {
+            var r = new AquaTunerRule();
+
+            var hotWithSteel = Snap.Fresh().WithHeat(312f).WithResource(Elements.Steel, 400);
+            Assert.True(r.IsRelevant(hotWithSteel));
+            Assert.False(r.IsSatisfied(hotWithSteel));
+
+            // Hot but no materials yet -> heat.awareness territory, not the AquaTuner build.
+            Assert.False(r.IsRelevant(Snap.Fresh().WithHeat(312f)));
+
+            // Hot, has materials, already has an AquaTuner -> solved.
+            Assert.True(r.IsSatisfied(Snap.Fresh().WithHeat(312f)
+                                          .WithResource(Elements.Steel, 400).With(Prefabs.AquaTuner)));
+
+            // Cool base -> not relevant even with materials.
+            Assert.False(r.IsRelevant(Snap.Fresh().WithHeat(298f).WithResource(Elements.Steel, 400)));
+        }
     }
 }

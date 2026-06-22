@@ -79,18 +79,30 @@ mods folder (`dotnet build -c Release`).
 
 ---
 
-## 🔜 Next — Phase 5: Rule depth + heavier probes
-Grow the rule set across the tiers in `milestones.yaml` (most have `status: draft` until the
-StateReader can detect them). The valuable mid-game "what now?" rules live here.
+## 🔜 In progress — Phase 5: Rule depth + heavier probes
+Growing the rule set across the tiers in `milestones.yaml`. **19 of 33 milestones now have live
+detection** (up from 5). The valuable mid-game "what now?" rules live here.
 
-Deferred state probes that unblock whole groups of rules (see CLAUDE.md §5 `🔜` rows):
-- **Power** — generated/consumed W, battery %. Needs reflection over `CircuitManager`'s
-  private circuit list (no public enumerator). Unblocks `power.brownout`, `power.coal`, etc.
+Done so far in Phase 5:
+- ✅ Building-count progression rules: `power.coal`, `industry.refined_metal`, plus the early→mid
+  gap-fillers `food.cooked`, `water.sieve`, `sanitation.lavatory`.
+- ✅ **Power** probe — generated/consumed W + battery %, via reflection over `CircuitManager`'s
+  private `circuitInfo` list. Drives `power.basic` (no battery / brownout).
+- ✅ **Stress / morale** probe — average duplicant stress (`Db.Get().Amounts.Stress`). Drives
+  `morale.basics`.
+- ✅ **Heat** probe — temperature sampled at each dupe's cell (not the whole map). Drives
+  `heat.awareness` and `cooling.aquatuner`.
+- ✅ Resource tags for Steel/Plastic → `industry.steel`, `industry.plastic`.
+- ✅ Guide-mined mid-game rules: `suits.atmo` (atmo-suit setup), `ranching.coal` (renewable coal),
+  `power.petroleum` (denser-fuel power), `cooling.aquatuner` (AquaTuner loop on a hot base).
+
+Still to do:
 - **Calories** — total stored calories (the `RationTracker` is a *consumption* tracker, not a
   stockpile). Unblocks food-buffer rules.
-- **Stress / morale** — average across duplicants. Unblocks `morale.*`, `dupes.skills`.
-- **Heat** — sample temperatures at a handful of representative buildings (not the whole map).
-  Unblocks `heat.awareness`, `cooling.aquatuner`, `base.industrial_brick`.
+- **Heat (more)** — confirm the AquaTuner prefab id to detect "no active cooling" for
+  `cooling.aquatuner` / `base.industrial_brick`.
+- **Dupes** — per-dupe morale-vs-requirement for `dupes.skills`; crop-type for `food.sustainable`;
+  oil-biome discovery for `power.petroleum`.
 - **Rooms/ranches** — detect a Stable + critter type for `ranching.coal`, room queries.
 - Cache the expensive building-count probe more aggressively than the cheap numeric probes.
 - Tune urgency bands against real saves (a fresh base, a stalled cycle-80 base, a mature
